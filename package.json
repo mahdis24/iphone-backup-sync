@@ -16,7 +16,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "check": "powershell -ExecutionPolicy Bypass -File ./check.ps1"
+    "check": "powershell -ExecutionPolicy Bypass -File ./scripts/check.ps1",
+    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
