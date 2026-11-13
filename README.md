@@ -1,55 +1,103 @@
+<div align="center">
+
+<img src="src-tauri/icons/128x128.png" width="120" height="120" alt="iPhone Backup Sync Logo" />
+
 # iPhone Backup Sync
 
-[![CI](https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8D5?logo=tauri&logoColor=white)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-2024%20Edition-dea584?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
+<p>
+  <a href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"><img src="https://img.shields.io/github/v/release/mahdis24/iphone-backup-sync?color=24C8D5&label=Release&logo=github" alt="GitHub Release" /></a>
+  <a href="https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml"><img src="https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Platform" /></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-v2-24C8D5?logo=tauri&logoColor=white" alt="Tauri v2" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024%20Edition-dea584?logo=rust&logoColor=white" alt="Rust" /></a>
+  <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js&logoColor=white" alt="Vue 3" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+</p>
 
-A high-reliability, zero-telemetry desktop application built with **Tauri v2**, **Rust**, and **Vue 3** that solves the notorious Windows MTP transfer crashes (*"A device attached to the system is not functioning"*, *"Catastrophic failure"*, silent freezes, and corrupt partial files) when backing up photos and videos from iPhones to Windows.
+### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
 
----
-
-## The Problem with Windows MTP & iOS
-
-Anyone who has tried copying large camera rolls (100+ GB of HEIC, ProRAW, and 4K ProRes videos) from an iPhone to Windows using Windows File Explorer has run into:
-1. **MTP Driver Timeouts & Hangs**: Explorer locks up completely when an asset cannot be transcoded or read in time, forcing you to unplug the device and guess where the transfer stopped.
-2. **Accidental Overwrites or Duplicates**: Explorer blindly asks to overwrite or skip, without checking whether existing files are valid or identical in byte size.
-3. **Hidden Unicode Markers**: iOS directory and file names often include invisible Unicode direction markers (`\u{200E}`, `\u{200F}`, `\u{202A}`–`\u{202E}`) that cause path comparisons to silently fail or create phantom folders on NTFS drives.
-4. **Stuck Assets Halting the Entire Batch**: A single corrupted live photo or iCloud-offloaded stub stalls the whole transfer.
-
-**iPhone Backup Sync** communicates directly with the low-level **Windows Portable Devices (WPD)** COM subsystem in Rust, streaming media in chunks, diffing files with byte-exact precision, recovering from crashes automatically, and letting you skip problematic assets with a single keystroke.
+</div>
 
 ---
 
-## 💡 Why I Built This
+**iPhone Backup Sync** is a high-performance desktop application designed for fast, incremental local backup of iPhone DCIM photos and videos to Windows drives using Rust, Tauri, and `libimobiledevice` / Windows Portable Devices (WPD) protocols. Communicating directly with low-level device streaming interfaces, it prevents MTP transfer freezes, handles size conflicts without overwriting, and operates completely offline with zero cloud subscriptions.
 
-This project started out of a personal frustration: trying to reliably back up thousands of photos and large 4K videos from an iPhone to a Windows PC over USB/MTP. Between Windows Explorer's infamous *"Catastrophic failure"* errors, silent overwrites, and transfers freezing mid-way without telling you which files actually made it, backing up media became a chore.
+---
 
-After building a local script to solve this for my own workflow, I decided to turn it into a proper desktop utility and open-source it—hoping it saves time and headaches for anyone else dealing with the same Windows + iPhone MTP bottlenecks.
+## Comparison
+
+| Feature / Capability                      | `iphone-backup-sync`                                                                                              | Windows File Explorer                                                                                     | iTunes / iCloud for Windows                                                                         |
+| :---------------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| **Incremental Sync**                      | **Yes** — indexes destination and copies only new or modified assets                                              | **No** — manual drag-and-drop; re-evaluates all files on every copy                                       | **Partial** — iTunes creates opaque device image; iCloud syncs through cloud                        |
+| **Conflict & Duplicate Handling**         | **Non-destructive** — preserves originals, saves size mismatches as `<stem>_new.<ext>`, skips verified duplicates | **Destructive / Guesswork** — prompts to overwrite or skip without byte verification                      | **Opaque** — overwrites or replaces local files based on cloud cache state                          |
+| **Connection Stability & Crash Recovery** | **High** — atomic `.part` chunked streaming, lockfile crash recovery, and auto-quarantine                         | **Poor** — freezes with _"Catastrophic failure"_ or _"Device unreachable"_, leaving corrupt partial files | **Moderate / Rigid** — fails entire backup batch if a single connection timeout occurs              |
+| **Cloud & Subscription Requirements**     | **Zero** — 100% offline, local direct USB transfer                                                                | **Zero** — offline USB, but hampered by MTP driver stalls                                                 | **Required for Full Library** — requires Apple ID and paid iCloud storage plans for large libraries |
+| **Stuck File Handling**                   | **Instant skip** with <kbd>S</kbd> key; blacklists failing asset without halting batch                            | **Unresponsive** — hangs entire Explorer window; requires killing task or unplugging device               | **Fails entire process** — aborts backup on unreadable files                                        |
+| **Path & Unicode Integrity**              | **Sanitized** — strips invisible iOS Unicode direction markers (`\u{200E}`, `\u{200F}`, etc.)                     | **Unsanitized** — fails path checks or creates phantom folders on NTFS drives                             | **Abstracted** — stored inside proprietary iOS backup database structure                            |
 
 ---
 
 ## Preview
 
-![iPhone Backup Sync Screenshot](docs/screenshots/preview.png)
-*(Drop an interface preview screenshot at `docs/screenshots/preview.png`)*
+![iPhone Backup Sync Dashboard](docs/screenshots/preview.png)
 
 ---
 
-## Key Features
+## Installation & Windows SmartScreen
 
-- **Direct WPD COM Integration**: Native access to `IPortableDeviceManager` and `IPortableDeviceContent` without relying on flaky Windows Explorer shell extensions.
-- **Unicode Path Sanitization**: Strips invisible directional markers (`\u{200E}`, `\u{200F}`, `\u{202A}`..=`\u{202E}`) to ensure reliable NTFS and path matching.
-- **Byte-Exact Diffing**:
-  - Classifies assets into `NEW`, `MISMATCH`, and `VERIFIED_IGNORED`.
-  - **Non-Destructive `_new` Variant Rule**: Size-mismatched files are never overwritten; they are saved alongside originals as `<stem>_new.<ext>`. If a `_new` variant of exact size already exists in the backup, the file is automatically recognized as backed up and skipped.
-- **Resilient Chunked Streaming**: Media is read in 64KB–256KB streams directly to `.part` files, verifying integrity before renaming to final filenames.
-- **Crash Recovery & Lockfile**: Maintains a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs, the stalled asset is automatically moved to `skip_list.json` on the next launch.
-- **Instant Skip (<kbd>S</kbd> Shortcut)**: Press <kbd>S</kbd> or click **Skip Current** to instantly abort a hanging file, purge its partial file on disk, blacklist it in `skip_list.json`, and proceed with the remaining queue.
-- **100% Offline & Private**: Zero cloud dependencies, zero telemetry, zero analytics. All operations occur strictly locally over USB.
+Download the latest `.exe` installer or standalone executable from the [GitHub Releases](https://github.com/mahdis24/iphone-backup-sync/releases/latest) page.
+
+### Handling the "Unknown Publisher" Notice
+
+When running the installer for the first time, Windows Defender SmartScreen may display a warning dialog stating _"Windows protected your PC"_ or _"Unknown Publisher"_.
+
+> **Why does this happen?**  
+> `iphone-backup-sync` is a free, community-driven open-source project. Code-signing certificates that suppress this prompt (Extended Validation / EV certificates) require costly annual subscriptions from commercial certificate authorities.
+
+To run the application:
+
+1. Click **More info** on the SmartScreen dialog.
+2. Click **Run anyway**.
+
+**Security & Open-Source Assurance:**
+
+- The complete source code is publicly accessible and auditable in this repository.
+- Binaries are built transparently in isolated virtual machines using GitHub Actions (`.github/workflows/release.yml`).
+- No telemetry, analytics, or external network requests are executed at any time.
+- You can inspect the automated build logs or build the binary locally from source.
+
+---
+
+## Recommended iPhone Setting
+
+To avoid mid-transfer iOS transcoding crashes over USB, configure your device:
+
+1. Open **Settings** on your iPhone.
+2. Navigate to **Photos**.
+3. Scroll to the bottom under **Transfer to Mac or PC** and select **Keep Originals**.
+
+Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or ProRes/H.264 transcoding, which is the primary cause of MTP stream timeouts and device resets.
+
+---
+
+## Core Features
+
+- **Direct WPD & MTP Streaming:** Directly interfaces with the Windows Portable Devices COM subsystem (`IPortableDeviceManager`, `IPortableDevice`, `IPortableDeviceContent`, `IStream`) and compatible with `ifuse` / `libimobiledevice` architectures, eliminating Explorer shell crashes.
+- **Recursive DCIM Scanning:** Recursively traverses the iPhone storage root, automatically discovering all media subdirectories (`DCIM/*APPLE`).
+- **Byte-Exact Diffing & Classification:** Scans destination folders via indexed hash maps, classifying assets into:
+  - `NEW`: Asset does not exist in target backup directory.
+  - `MISMATCH`: Asset exists with a different file size.
+  - `VERIFIED_IGNORED`: Asset exists with exact byte match, or an exact-sized `_new` variant is already present.
+  - `SKIPPED`: Asset is listed in the persistent skip list.
+- **Non-Destructive Conflict Resolution:** Size-mismatched files are saved with a `_new` suffix (e.g., `IMG_1234_new.HEIC`). If an identical-sized `_new` file already exists, it is marked as backed up and skipped automatically.
+- **Resilient Chunked Streaming:** Media streams in 64 KB – 256 KB buffers directly into temporary `.part` files, flushing and atomically renaming to final destination only after complete transfer.
+- **Crash Recovery & Lockfile Tracking:** Employs a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs mid-copy, the interrupted file is automatically quarantined to `skip_list.json` on next startup, and partial files are removed.
+- **Instant Skip Shortcut (<kbd>S</kbd>):** Press <kbd>S</kbd> or click **Skip Current** to immediately drop an in-flight file, delete its partial fragment, add it to `skip_list.json`, and proceed with remaining queue.
+- **Skip List Management:** Full UI interface to inspect blacklisted files, remove specific entries, or clear the entire skip list.
+- **Unicode Path Sanitization:** Strips invisible Unicode direction control markers (`\u{200E}`, `\u{200F}`, `\u{202A}`..=`\u{202E}`) from iOS metadata to ensure valid NTFS paths.
+- **Real-Time Transfer Metrics:** Displays current file progress, overall batch percentage, streaming throughput (MB/s), and real-time status banners.
+- **Offline & Private:** Operates strictly over local USB with zero telemetry or network calls.
 
 ---
 
@@ -58,123 +106,108 @@ After building a local script to solve this for my own workflow, I decided to tu
 ```
 iphone-backup-sync/
 ├── src/                          # Vue 3 + TypeScript Frontend
-│   ├── App.vue                   # Dark-mode dashboard, metrics & file tables
-│   ├── types.ts                  # Serde-synchronized TypeScript interfaces
-│   ├── style.css                 # Sleek 6px custom scrollbars & layout rules
-│   └── main.ts                   # Vue app initialization
-└── src-tauri/                    # Rust Backend (Tauri v2)
-    ├── src/
-    │   ├── wpd.rs                # Windows Portable Devices COM wrappers & chunk streaming
-    │   ├── sync.rs               # Diffing engine, crash recovery, and skip-list manager
-    │   └── lib.rs                # Tauri command handlers & IPC event emitter
-    ├── Cargo.toml                # Native windows crate features (WPD, COM, Shell)
-    └── tauri.conf.json           # Tauri v2 application configuration
+│   ├── App.vue                   # Dashboard, real-time monitors, and file tables
+│   ├── types.ts                  # Serde-synchronized TypeScript data contracts
+│   ├── style.css                 # Dark-mode styling, responsive metrics, custom scrollbars
+│   └── main.ts                   # Application bootstrap
+├── src-tauri/                    # Rust Backend (Tauri v2)
+│   ├── src/
+│   │   ├── wpd.rs                # Windows Portable Devices COM wrappers & chunked streaming
+│   │   ├── sync.rs               # Diffing engine, crash recovery, and skip-list manager
+│   │   ├── lib.rs                # Tauri command dispatch and IPC event emitters
+│   │   └── main.rs               # Executable entrypoint
+│   ├── Cargo.toml                # Rust dependencies (windows, tokio, walkdir, serde)
+│   └── tauri.conf.json           # Tauri v2 application configuration & bundle settings
+└── .github/workflows/            # GitHub Actions CI/CD pipelines
+    ├── ci.yml                    # Automated formatting, linting, and build verification
+    └── release.yml               # Automated release packaging via tauri-action
 ```
 
 ---
 
-## Prerequisites
+## Building from Source
 
-1. **Windows 10 / 11** (64-bit).
-2. **iPhone Configuration**:
-   - On your iPhone, navigate to **Settings** > **Photos**.
-   - Scroll to the bottom under **Transfer to Mac or PC** and select **"Keep Originals"**.
-   *(This prevents iOS from attempting on-the-fly JPEG/H.264 transcoding over USB, which is the #1 cause of MTP disconnects).*
-3. **Development Environment**:
-   - [Rust](https://rustup.rs/) (stable `x86_64-pc-windows-msvc` toolchain recommended).
-   - [Node.js](https://nodejs.org/) (v18+) or [Bun](https://bun.sh/) (v1.0+).
-   - [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (included with standard Windows Rust setups).
+### Prerequisites
 
----
-
-## Getting Started
+- **Operating System:** Windows 10 or 11 (64-bit).
+- **Rust Toolchain:** Stable `x86_64-pc-windows-msvc` toolchain ([rustup.rs](https://rustup.rs/)).
+- **Node.js runtime or Bun:** [Bun](https://bun.sh/) (v1.0+) or [Node.js](https://nodejs.org/) (v18+).
+- **C++ Build Tools:** [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with Windows SDK.
 
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/mahdis24/iphone-backup-sync.git
 cd iphone-backup-sync
 ```
 
-### 2. Install Dependencies
-Using **Bun**:
+### 2. Install Frontend Dependencies
+
+Using Bun (recommended):
+
 ```bash
 bun install
 ```
-*(or using npm)*:
+
+Using npm:
+
 ```bash
 npm install
 ```
 
 ### 3. Run in Development Mode
+
 ```bash
 bun run tauri dev
-# or
-npm run tauri dev
+# or: npm run tauri dev
 ```
 
-### 4. Build Standalone Installer
+### 4. Run Quality Checks & Linters
+
+```bash
+# Frontend type check & build
+bun run build
+# or: npm run build
+
+# Rust formatting check
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+# Rust Clippy linter
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+```
+
+### 5. Build Standalone Installer & Binary
+
 ```bash
 bun run tauri build
-# or
-npm run tauri build
+# or: npm run tauri build
 ```
-The compiled executable and `.msi` / `.exe` installer will be generated in `src-tauri/target/release/bundle/`.
+
+Compiled binaries and NSIS installer (`.exe`) are output to:
+`src-tauri/target/release/bundle/nsis/`
 
 ---
 
-## How to Use
+## Usage Workflow
 
-1. Connect your iPhone to your PC via a reliable USB-C or Lightning cable.
-2. Unlock your iPhone and tap **"Trust This Computer"** if prompted.
-3. Launch **iPhone Backup Sync**. Your device will appear in the top status bar (click **Refresh** if connected after launch).
-4. Select your backup destination folder (click **Browse...** to pick any internal, external, or network drive).
-5. Click **Scan iPhone**. The app will recursively traverse your DCIM library and classify all media against your destination folder.
-6. Click **Start Sync** to begin streamed transfer with live progress and transfer rate (MB/s).
-7. If any file hangs or you wish to bypass it, press <kbd>S</kbd> to skip it immediately.
+1. Connect your iPhone to your Windows PC with a high-quality USB cable.
+2. Unlock your iPhone and tap **Trust This Computer** if prompted.
+3. Launch **iPhone Backup Sync**. The detected device will appear in the top-right status badge.
+4. Click **Browse...** to select your target backup directory on any internal, external, or networked drive.
+5. Click **Scan iPhone**. The application will recursively index your DCIM directory and compare it against the backup folder.
+6. Click **Start Sync** to initiate incremental chunked copying.
+7. Use <kbd>S</kbd> at any point during active transfer to skip an unresponsive or corrupt asset.
 
 ---
 
 ## Contributing
 
-Contributions, bug reports, and suggestions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting a pull request.
-
-To run code-quality checks locally:
-```bash
-# Frontend type check & build
-bun run build    # or: npm run build
-
-# Rust formatting & linter
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-```
+Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening a pull request.
 
 ---
 
-## 💬 Feedback & Early Stage Notice
+## License & Security
 
-This is an **early-stage release (`v0.1.0`)** built around real-world personal needs. There is plenty of room to grow—such as side-by-side media previews, multi-device profiles, and broader Android/camera MTP optimizations.
-
-If you try it out and have suggestions, run into edge cases, or want to contribute improvements, please **open an Issue or submit a Pull Request**. Constructive feedback is genuinely welcome!
-
----
-
-## Security & Privacy
-
-This application is strictly local and communicates solely with your attached device over USB and your local filesystem. Read [SECURITY.md](SECURITY.md) for details on our vulnerability disclosure policy and local data handling.
-
----
-
-## 🙏 Acknowledgments
-
-This application was architected and developed with AI-assisted engineering workflows powered by **Gemini** and **Antigravity**.
-
----
-
-## Author & License
-
-Created by **Mahdi Salek**:
-- **GitHub**: [@mahdis24](https://github.com/mahdis24)
-- **LinkedIn**: [mahdi-s24](https://www.linkedin.com/in/mahdi-s24/)
-- **Website**: [mahdis24.tech](https://mahdis24.tech)
-
-Released under the [MIT License](LICENSE).
+- **License:** Distributed under the [MIT License](LICENSE).
+- **Security:** Review [SECURITY.md](SECURITY.md) for vulnerability disclosure procedures.
+- **Author:** Created by [Mahdi Salek](https://mahdis24.tech) ([@mahdis24](https://github.com/mahdis24)).
