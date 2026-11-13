@@ -1,0 +1,33 @@
+{
+  "name": "iphone-backup-sync",
+  "version": "0.1.0",
+  "description": "High-reliability Windows MTP/WPD photo & video backup tool for iOS devices",
+  "private": true,
+  "type": "module",
+  "author": "Mahdi Salek <https://mahdis24.tech>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mahdis24/iphone-backup-sync.git"
+  },
+  "homepage": "https://github.com/mahdis24/iphone-backup-sync#readme",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-opener": "^2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "vue-tsc": "^3.3.5"
+  }
+}
