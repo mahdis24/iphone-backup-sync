@@ -3,6 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
+# Lockfiles (Explicitly track Bun lockfiles)
+!bun.lock
+!bun.lockb
+
 # Production & Build outputs
 dist/
 dist-ssr/

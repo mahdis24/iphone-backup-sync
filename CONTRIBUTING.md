@@ -39,7 +39,7 @@ Open an issue using the Feature Request template detailing:
    Ensure all checks pass before pushing:
    ```bash
    # Frontend type check & bundle
-   npm run build
+   bun run build    # or: npm run build
 
    # Rust formatting check
    cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

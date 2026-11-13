@@ -16,11 +16,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,7 +31,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: npm ci
+        run: bun install
 
       - name: Build and Publish Tauri Release
         uses: tauri-apps/tauri-action@v0

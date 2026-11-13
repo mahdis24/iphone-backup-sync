@@ -141,7 +141,7 @@ Contributions, bug reports, and suggestions are welcome! Please read [CONTRIBUTI
 To run code-quality checks locally:
 ```bash
 # Frontend type check & build
-npm run build
+bun run build    # or: npm run build
 
 # Rust formatting & linter
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
