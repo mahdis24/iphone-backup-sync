@@ -62,5 +62,5 @@ Desktop.ini
 *.sw?
 *.swp
 
-# Custom Runner
-check.ps1
+# Custom scripts
+scripts/*
