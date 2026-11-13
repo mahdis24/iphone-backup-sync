@@ -61,3 +61,6 @@ Desktop.ini
 *.sln
 *.sw?
 *.swp
+
+# Custom Runner
+check.ps1
