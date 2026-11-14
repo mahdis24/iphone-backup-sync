@@ -92,7 +92,7 @@ Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or 
   - `VERIFIED_IGNORED`: Asset exists with exact byte match, or an exact-sized `_new` variant is already present.
   - `SKIPPED`: Asset is listed in the persistent skip list.
 - **Non-Destructive Conflict Resolution:** Size-mismatched files are saved with a `_new` suffix (e.g., `IMG_1234_new.HEIC`). If an identical-sized `_new` file already exists, it is marked as backed up and skipped automatically.
-- **Resilient Chunked Streaming:** Media streams in 64 KB – 256 KB buffers directly into temporary `.part` files, flushing and atomically renaming to final destination only after complete transfer.
+- **Resilient Chunked Streaming:** Media streams in 64 KB - 256 KB buffers directly into temporary `.part` files, flushing and atomically renaming to final destination only after complete transfer.
 - **Crash Recovery & Lockfile Tracking:** Employs a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs mid-copy, the interrupted file is automatically quarantined to `skip_list.json` on next startup, and partial files are removed.
 - **Instant Skip Shortcut (<kbd>S</kbd>):** Press <kbd>S</kbd> or click **Skip Current** to immediately drop an in-flight file, delete its partial fragment, add it to `skip_list.json`, and proceed with remaining queue.
 - **Skip List Management:** Full UI interface to inspect blacklisted files, remove specific entries, or clear the entire skip list.
@@ -211,4 +211,5 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
 
 - **License:** Distributed under the [MIT License](LICENSE).
 - **Security:** Review [SECURITY.md](SECURITY.md) for vulnerability disclosure procedures.
+- **Changelog:** Review [CHANGELOG.md](CHANGELOG.md) for version release history.
 - **Author:** Created by [Mahdi Salek](https://mahdis24.tech) ([@mahdis24](https://github.com/mahdis24)).
