@@ -135,7 +135,36 @@ pub fn get_connected_devices() -> Result<Vec<DeviceInfo>, String> {
     }
 }
 
-pub fn open_device(pnp_id: &str) -> Result<IPortableDevice, String> {
+pub struct WpdDeviceGuard {
+    device: IPortableDevice,
+}
+
+impl WpdDeviceGuard {
+    pub fn new(device: IPortableDevice) -> Self {
+        Self { device }
+    }
+
+    pub fn device(&self) -> &IPortableDevice {
+        &self.device
+    }
+}
+
+impl std::ops::Deref for WpdDeviceGuard {
+    type Target = IPortableDevice;
+    fn deref(&self) -> &Self::Target {
+        &self.device
+    }
+}
+
+impl Drop for WpdDeviceGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.device.Close();
+        }
+    }
+}
+
+pub fn open_device(pnp_id: &str) -> Result<WpdDeviceGuard, String> {
     unsafe {
         let device: IPortableDevice =
             match CoCreateInstance(&PortableDeviceFTM, None, CLSCTX_INPROC_SERVER) {
@@ -157,15 +186,19 @@ pub fn open_device(pnp_id: &str) -> Result<IPortableDevice, String> {
         let pnp_id_u16: Vec<u16> = pnp_id.encode_utf16().chain(std::iter::once(0)).collect();
         device
             .Open(PCWSTR(pnp_id_u16.as_ptr()), &client_info)
-            .map_err(|e| format!("Failed to open WPD device: {}", e))?;
+            .map_err(|e| format!("Failed to open WPD device: {}. Please ensure your iPhone is unlocked and trusted.", e))?;
 
-        Ok(device)
+        Ok(WpdDeviceGuard::new(device))
     }
 }
 
-pub fn scan_files<F>(device: &IPortableDevice, mut on_found: F) -> Result<Vec<DeviceFile>, String>
+pub fn scan_files<F>(
+    device: &IPortableDevice,
+    cancel_flag: &AtomicBool,
+    mut on_progress: F,
+) -> Result<Vec<DeviceFile>, String>
 where
-    F: FnMut(&DeviceFile),
+    F: FnMut(&str, Option<&DeviceFile>),
 {
     unsafe {
         let content = device
@@ -183,7 +216,8 @@ where
             "DEVICE",
             "",
             &mut all_files,
-            &mut on_found,
+            cancel_flag,
+            &mut on_progress,
         )?;
 
         Ok(all_files)
@@ -196,11 +230,16 @@ unsafe fn traverse_object<F>(
     parent_id: &str,
     current_rel_path: &str,
     collected: &mut Vec<DeviceFile>,
-    on_found: &mut F,
+    cancel_flag: &AtomicBool,
+    on_progress: &mut F,
 ) -> Result<(), String>
 where
-    F: FnMut(&DeviceFile),
+    F: FnMut(&str, Option<&DeviceFile>),
 {
+    if cancel_flag.load(Ordering::Relaxed) {
+        return Err("Scan cancelled by user".to_string());
+    }
+
     unsafe {
         let parent_id_u16: Vec<u16> = parent_id.encode_utf16().chain(std::iter::once(0)).collect();
         let enum_objects: IEnumPortableDeviceObjectIDs =
@@ -210,6 +249,10 @@ where
             };
 
         loop {
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Err("Scan cancelled by user".to_string());
+            }
+
             let mut object_ids: [PWSTR; 32] = [PWSTR::null(); 32];
             let mut fetched: u32 = 0;
             let hr = enum_objects.Next(&mut object_ids, &mut fetched);
@@ -218,6 +261,10 @@ where
             }
 
             for &obj_pwstr in object_ids.iter().take(fetched as usize) {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    return Err("Scan cancelled by user".to_string());
+                }
+
                 if obj_pwstr.is_null() {
                     continue;
                 }
@@ -276,13 +323,18 @@ where
                         format!("{}/{}", current_rel_path, clean_name)
                     };
 
+                    if !next_rel_path.is_empty() {
+                        on_progress(&next_rel_path, None);
+                    }
+
                     traverse_object(
                         content,
                         properties,
                         &obj_id,
                         &next_rel_path,
                         collected,
-                        on_found,
+                        cancel_flag,
+                        on_progress,
                     )?;
                 } else {
                     // It is a file
@@ -297,11 +349,11 @@ where
 
                     let item = DeviceFile {
                         object_id: obj_id,
-                        relative_path: rel_path,
+                        relative_path: rel_path.clone(),
                         filename: clean_name,
                         size: file_size,
                     };
-                    on_found(&item);
+                    on_progress(&rel_path, Some(&item));
                     collected.push(item);
                 }
             }

@@ -18,6 +18,8 @@ pub enum FileClassification {
     VerifiedIgnored,
     #[serde(rename = "SKIPPED")]
     Skipped,
+    #[serde(rename = "ERROR")]
+    Error,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +41,17 @@ pub struct ScanSummary {
     pub mismatch_count: usize,
     pub verified_ignored_count: usize,
     pub skipped_count: usize,
+    #[serde(default)]
+    pub error_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanProgressPayload {
+    pub stage: String,
+    pub message: String,
+    pub current: usize,
+    pub total: usize,
+    pub percent: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,9 +131,17 @@ pub fn handle_crash_recovery(storage_dir: &Path) -> Option<String> {
             let _ = save_skip_list(storage_dir, &list);
 
             // Clean up any incomplete partial file
-            let part_path = PathBuf::from(format!("{}.part", info.target_path));
+            let target = PathBuf::from(&info.target_path);
+            let part_path = target.with_extension(format!(
+                "{}.part",
+                target.extension().and_then(|s| s.to_str()).unwrap_or("")
+            ));
             if part_path.exists() {
-                let _ = fs::remove_file(part_path);
+                let _ = fs::remove_file(&part_path);
+            }
+            let alt_part = PathBuf::from(format!("{}.part", info.target_path));
+            if alt_part.exists() {
+                let _ = fs::remove_file(&alt_part);
             }
 
             // Remove the lock file
@@ -156,35 +177,55 @@ pub fn get_new_variant_rel_path(rel_path: &str) -> String {
     }
 }
 
-pub fn index_backup_directory(backup_dir: &Path) -> HashMap<String, u64> {
+pub fn index_backup_directory<F>(
+    backup_dir: &Path,
+    cancel_flag: &AtomicBool,
+    mut on_progress: F,
+) -> Result<HashMap<String, u64>, String>
+where
+    F: FnMut(usize),
+{
     let mut map = HashMap::new();
     if !backup_dir.exists() {
-        return map;
+        return Ok(map);
     }
 
+    let mut count = 0;
     for entry in WalkDir::new(backup_dir).into_iter().filter_map(|e| e.ok()) {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled by user".to_string());
+        }
         if !entry.file_type().is_file() {
             continue;
         }
         if let (Ok(rel), Ok(meta)) = (entry.path().strip_prefix(backup_dir), entry.metadata()) {
             let norm = normalize_rel_path(&rel.to_string_lossy());
             map.insert(norm, meta.len());
+            count += 1;
+            if count % 200 == 0 {
+                on_progress(count);
+            }
         }
     }
+    on_progress(count);
 
-    map
+    Ok(map)
 }
 
-pub fn diff_and_classify_files(
+pub fn diff_and_classify_files<F>(
     iphone_files: &[DeviceFile],
-    backup_dir: &Path,
+    backup_index: &HashMap<String, u64>,
     storage_dir: &Path,
-) -> ScanResult {
+    cancel_flag: &AtomicBool,
+    mut on_progress: F,
+) -> Result<ScanResult, String>
+where
+    F: FnMut(usize, usize),
+{
     // Check crash recovery first
     let _ = handle_crash_recovery(storage_dir);
 
     let skip_set = load_skip_list(storage_dir);
-    let backup_index = index_backup_directory(backup_dir);
 
     let mut scanned_files = Vec::with_capacity(iphone_files.len());
     let mut summary = ScanSummary {
@@ -193,7 +234,17 @@ pub fn diff_and_classify_files(
         ..Default::default()
     };
 
-    for item in iphone_files {
+    let total = iphone_files.len();
+
+    for (idx, item) in iphone_files.iter().enumerate() {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled by user".to_string());
+        }
+
+        if (idx + 1) % 100 == 0 || idx + 1 == total {
+            on_progress(idx + 1, total);
+        }
+
         let norm_rel = normalize_rel_path(&item.relative_path);
         let in_skip = skip_set.contains(&norm_rel);
 
@@ -254,11 +305,11 @@ pub fn diff_and_classify_files(
     let mut skip_list: Vec<String> = skip_set.into_iter().collect();
     skip_list.sort();
 
-    ScanResult {
+    Ok(ScanResult {
         files: scanned_files,
         summary,
         skip_list,
-    }
+    })
 }
 
 pub struct SyncController {
@@ -297,9 +348,11 @@ where
 
     let total_files = files_to_sync.len();
     let lock_path = get_lock_file_path(storage_dir);
+    let mut was_cancelled = false;
 
     for (index, file_item) in files_to_sync.iter().enumerate() {
         if controller.cancel_sync_flag.load(Ordering::Relaxed) {
+            was_cancelled = true;
             on_progress(SyncProgressPayload {
                 current_file_index: index,
                 total_files,
@@ -309,7 +362,7 @@ where
                 total_bytes: file_item.size,
                 status: "aborted".to_string(),
                 speed_bytes_sec: 0.0,
-                error: Some("Sync cancelled by user".to_string()),
+                error: Some("Sync stopped by user".to_string()),
             });
             break;
         }
@@ -370,8 +423,42 @@ where
             },
         );
 
-        // Always clean up lock file after file finishes or fails
+        // Always clean up lock file after file finishes, fails, or cancels
         let _ = fs::remove_file(&lock_path);
+
+        // Helper to remove any leftover partial file for this target
+        let clean_part_file = || {
+            let part_path = dest_path.with_extension(format!(
+                "{}.part",
+                dest_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+            ));
+            if part_path.exists() {
+                let _ = fs::remove_file(&part_path);
+            }
+            let alt_part = PathBuf::from(format!("{}.part", dest_path.to_string_lossy()));
+            if alt_part.exists() {
+                let _ = fs::remove_file(&alt_part);
+            }
+        };
+
+        // Check if user requested cancellation of the whole sync
+        if controller.cancel_sync_flag.load(Ordering::Relaxed) {
+            was_cancelled = true;
+            clean_part_file();
+            // DO NOT add to skip list! This was a stop/cancel, not a skip.
+            on_progress(SyncProgressPayload {
+                current_file_index: index + 1,
+                total_files,
+                filename: file_item.filename.clone(),
+                relative_path: file_item.relative_path.clone(),
+                bytes_copied: 0,
+                total_bytes: file_item.size,
+                status: "aborted".to_string(),
+                speed_bytes_sec: 0.0,
+                error: Some("Sync stopped by user".to_string()),
+            });
+            break;
+        }
 
         match stream_res {
             Ok(()) => {
@@ -388,10 +475,12 @@ where
                 });
             }
             Err(err) => {
-                let is_aborted = err.contains("Aborted")
+                clean_part_file();
+
+                let is_skipped = err.contains("Aborted")
                     || controller.abort_or_skip_flag.load(Ordering::Relaxed);
-                if is_aborted {
-                    // User skipped this file: add it to skip list
+                if is_skipped {
+                    // User explicitly skipped this file (via shortcut or Skip Current button)
                     let mut list = load_skip_list(storage_dir);
                     list.insert(normalize_rel_path(&file_item.relative_path));
                     let _ = save_skip_list(storage_dir, &list);
@@ -423,6 +512,19 @@ where
             }
         }
     }
+
+    // Always emit a terminal batch event so the frontend knows the process has definitely finished
+    on_progress(SyncProgressPayload {
+        current_file_index: total_files,
+        total_files,
+        filename: String::new(),
+        relative_path: String::new(),
+        bytes_copied: 0,
+        total_bytes: 0,
+        status: if was_cancelled { "aborted".to_string() } else { "finished".to_string() },
+        speed_bytes_sec: 0.0,
+        error: None,
+    });
 
     Ok(())
 }

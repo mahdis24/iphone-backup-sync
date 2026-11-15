@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::sync::{FileClassification, ScanResult, ScannedFile, SyncController};
+use crate::sync::{FileClassification, ScanProgressPayload, ScanResult, ScannedFile, SyncController};
 use crate::wpd::DeviceInfo;
 
 /// Shared application state managed by Tauri.
@@ -17,6 +17,8 @@ pub struct AppState {
     pub is_syncing: Arc<AtomicBool>,
     /// Atomic flag indicating whether an MTP device scan is currently in progress.
     pub is_scanning: Arc<AtomicBool>,
+    /// Atomic flag to request cancellation of the current device scan.
+    pub cancel_scan_flag: Arc<AtomicBool>,
 }
 
 fn get_storage_dir(app: &AppHandle) -> PathBuf {
@@ -49,15 +51,143 @@ async fn scan_device(
     }
 
     state.is_scanning.store(true, Ordering::Relaxed);
+    state.cancel_scan_flag.store(false, Ordering::Relaxed);
     let is_scanning = state.is_scanning.clone();
+    let cancel_scan_flag = state.cancel_scan_flag.clone();
     let storage_dir = get_storage_dir(&app);
     let backup_path = PathBuf::from(&backup_dir);
+    let app_handle = app.clone();
 
     let res = tokio::task::spawn_blocking(move || {
         let _com = wpd::ComGuard::new();
-        let device = wpd::open_device(&device_id)?;
-        let files = wpd::scan_files(&device, |_| {})?;
-        let scan_result = sync::diff_and_classify_files(&files, &backup_path, &storage_dir);
+
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "connecting".to_string(),
+            message: "Opening session with iPhone...".to_string(),
+            current: 0,
+            total: 0,
+            percent: 5,
+        });
+
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "connecting".to_string(),
+            message: "Opening session with iPhone...".to_string(),
+            current: 0,
+            total: 0,
+            percent: 5,
+        });
+
+        let device_guard = wpd::open_device(&device_id)?;
+
+        if cancel_scan_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled by user".to_string());
+        }
+
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "enumerating".to_string(),
+            message: "Scanning iPhone media storage...".to_string(),
+            current: 0,
+            total: 0,
+            percent: 10,
+        });
+
+        let mut count = 0;
+        let mut last_emit = std::time::Instant::now();
+
+        let files = wpd::scan_files(&device_guard, &cancel_scan_flag, |folder_or_path, maybe_file| {
+            if maybe_file.is_some() {
+                count += 1;
+            }
+            if last_emit.elapsed().as_millis() >= 60 || count % 20 == 0 {
+                last_emit = std::time::Instant::now();
+                let msg = match maybe_file {
+                    Some(_) => format!("Scanning iPhone media... ({} files found)", count),
+                    None => format!("Scanning folder: {} ({} files found)", folder_or_path, count),
+                };
+                let pct = 10 + std::cmp::min(25, (count as f64 / 150.0).round() as u8);
+                let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+                    stage: "enumerating".to_string(),
+                    message: msg,
+                    current: count,
+                    total: 0,
+                    percent: pct,
+                });
+            }
+        })?;
+
+        if cancel_scan_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled by user".to_string());
+        }
+
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "indexing".to_string(),
+            message: "Indexing local backup directory...".to_string(),
+            current: 0,
+            total: 0,
+            percent: 35,
+        });
+
+        let mut last_idx_emit = std::time::Instant::now();
+        let backup_index = sync::index_backup_directory(&backup_path, &cancel_scan_flag, |idx_count| {
+            if last_idx_emit.elapsed().as_millis() >= 60 {
+                last_idx_emit = std::time::Instant::now();
+                let pct = 35 + std::cmp::min(28, (idx_count as f64 / 800.0).round() as u8);
+                let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+                    stage: "indexing".to_string(),
+                    message: format!("Indexing local backup directory ({} files scanned)...", idx_count),
+                    current: idx_count,
+                    total: 0,
+                    percent: pct,
+                });
+            }
+        })?;
+
+        if cancel_scan_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled by user".to_string());
+        }
+
+        let total_iphone = files.len();
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "classifying".to_string(),
+            message: format!("Comparing {} iPhone files with backup...", total_iphone),
+            current: 0,
+            total: total_iphone,
+            percent: 65,
+        });
+
+        let mut last_cls_emit = std::time::Instant::now();
+        let scan_result = sync::diff_and_classify_files(
+            &files,
+            &backup_index,
+            &storage_dir,
+            &cancel_scan_flag,
+            |curr, tot| {
+                if last_cls_emit.elapsed().as_millis() >= 60 || curr == tot {
+                    last_cls_emit = std::time::Instant::now();
+                    let pct = if tot > 0 {
+                        65 + ((curr as f64 / tot as f64) * 33.0).round() as u8
+                    } else {
+                        98
+                    };
+                    let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+                        stage: "classifying".to_string(),
+                        message: format!("Comparing files: {} / {} ({}%)", curr, tot, pct),
+                        current: curr,
+                        total: tot,
+                        percent: pct,
+                    });
+                }
+            },
+        )?;
+
+        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
+            stage: "completed".to_string(),
+            message: format!("Scan complete: {} files discovered.", files.len()),
+            current: files.len(),
+            total: files.len(),
+            percent: 100,
+        });
+
         Ok(scan_result)
     })
     .await;
@@ -102,10 +232,14 @@ async fn start_sync(
     let backup_path = PathBuf::from(&backup_dir);
     let app_handle = app.clone();
 
-    // Filter to files that actually need to be transferred (NEW and MISMATCH)
+    // Filter to files that actually need to be transferred (NEW, MISMATCH, or retry ERROR)
     let pending_files: Vec<ScannedFile> = files
         .into_iter()
-        .filter(|f| f.status == FileClassification::New || f.status == FileClassification::Mismatch)
+        .filter(|f| {
+            f.status == FileClassification::New
+                || f.status == FileClassification::Mismatch
+                || f.status == FileClassification::Error
+        })
         .collect();
 
     if pending_files.is_empty() {
@@ -165,6 +299,19 @@ fn get_skip_list(app: AppHandle) -> Result<Vec<String>, String> {
     Ok(list)
 }
 
+/// Adds a specific relative path to the blacklist/skip list.
+#[tauri::command]
+fn add_to_skip_list(app: AppHandle, relative_path: String) -> Result<Vec<String>, String> {
+    let storage_dir = get_storage_dir(&app);
+    let mut set = sync::load_skip_list(&storage_dir);
+    let norm = sync::normalize_rel_path(&relative_path);
+    set.insert(norm);
+    sync::save_skip_list(&storage_dir, &set)?;
+    let mut list: Vec<String> = set.into_iter().collect();
+    list.sort();
+    Ok(list)
+}
+
 /// Removes a specific relative path from the blacklist/skip list.
 #[tauri::command]
 fn remove_from_skip_list(app: AppHandle, relative_path: String) -> Result<Vec<String>, String> {
@@ -186,6 +333,13 @@ fn clear_skip_list(app: AppHandle) -> Result<Vec<String>, String> {
     Ok(Vec::new())
 }
 
+/// Signals the active scan task to immediately cancel.
+#[tauri::command]
+fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
+    state.cancel_scan_flag.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
 /// Application entry point configuring Tauri plugins, state, and handlers.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -193,6 +347,7 @@ pub fn run() {
         controller: SyncController::new(),
         is_syncing: Arc::new(AtomicBool::new(false)),
         is_scanning: Arc::new(AtomicBool::new(false)),
+        cancel_scan_flag: Arc::new(AtomicBool::new(false)),
     };
 
     tauri::Builder::default()
@@ -202,10 +357,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_devices,
             scan_device,
+            cancel_scan,
             start_sync,
             skip_current_file,
             cancel_sync,
             get_skip_list,
+            add_to_skip_list,
             remove_from_skip_list,
             clear_skip_list,
         ])

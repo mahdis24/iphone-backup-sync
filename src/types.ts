@@ -1,4 +1,4 @@
-export type FileClassification = 'NEW' | 'MISMATCH' | 'VERIFIED_IGNORED' | 'SKIPPED';
+export type FileClassification = 'NEW' | 'MISMATCH' | 'VERIFIED_IGNORED' | 'SKIPPED' | 'ERROR';
 
 export interface DeviceInfo {
   id: string;
@@ -16,6 +16,7 @@ export interface ScannedFile {
   status: FileClassification;
   target_relative_path: string;
   existing_size?: number;
+  error?: string;
 }
 
 export interface ScanSummary {
@@ -25,6 +26,15 @@ export interface ScanSummary {
   mismatch_count: number;
   verified_ignored_count: number;
   skipped_count: number;
+  error_count?: number;
+}
+
+export interface ScanProgressPayload {
+  stage: 'connecting' | 'enumerating' | 'indexing' | 'classifying' | 'completed' | 'cancelled';
+  message: string;
+  current: number;
+  total: number;
+  percent: number;
 }
 
 export interface ScanResult {
@@ -40,7 +50,7 @@ export interface SyncProgressPayload {
   relative_path: string;
   bytes_copied: number;
   total_bytes: number;
-  status: 'copying' | 'completed' | 'skipped' | 'error' | 'aborted';
+  status: 'copying' | 'completed' | 'skipped' | 'error' | 'aborted' | 'finished';
   speed_bytes_sec: number;
   error?: string;
 }
