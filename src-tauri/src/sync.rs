@@ -521,7 +521,11 @@ where
         relative_path: String::new(),
         bytes_copied: 0,
         total_bytes: 0,
-        status: if was_cancelled { "aborted".to_string() } else { "finished".to_string() },
+        status: if was_cancelled {
+            "aborted".to_string()
+        } else {
+            "finished".to_string()
+        },
         speed_bytes_sec: 0.0,
         error: None,
     });

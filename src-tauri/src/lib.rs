@@ -6,7 +6,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::sync::{FileClassification, ScanProgressPayload, ScanResult, ScannedFile, SyncController};
+use crate::sync::{
+    FileClassification, ScanProgressPayload, ScanResult, ScannedFile, SyncController,
+};
 use crate::wpd::DeviceInfo;
 
 /// Shared application state managed by Tauri.
@@ -61,21 +63,27 @@ async fn scan_device(
     let res = tokio::task::spawn_blocking(move || {
         let _com = wpd::ComGuard::new();
 
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "connecting".to_string(),
-            message: "Opening session with iPhone...".to_string(),
-            current: 0,
-            total: 0,
-            percent: 5,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "connecting".to_string(),
+                message: "Opening session with iPhone...".to_string(),
+                current: 0,
+                total: 0,
+                percent: 5,
+            },
+        );
 
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "connecting".to_string(),
-            message: "Opening session with iPhone...".to_string(),
-            current: 0,
-            total: 0,
-            percent: 5,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "connecting".to_string(),
+                message: "Opening session with iPhone...".to_string(),
+                current: 0,
+                total: 0,
+                percent: 5,
+            },
+        );
 
         let device_guard = wpd::open_device(&device_id)?;
 
@@ -83,77 +91,103 @@ async fn scan_device(
             return Err("Scan cancelled by user".to_string());
         }
 
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "enumerating".to_string(),
-            message: "Scanning iPhone media storage...".to_string(),
-            current: 0,
-            total: 0,
-            percent: 10,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "enumerating".to_string(),
+                message: "Scanning iPhone media storage...".to_string(),
+                current: 0,
+                total: 0,
+                percent: 10,
+            },
+        );
 
         let mut count = 0;
         let mut last_emit = std::time::Instant::now();
 
-        let files = wpd::scan_files(&device_guard, &cancel_scan_flag, |folder_or_path, maybe_file| {
-            if maybe_file.is_some() {
-                count += 1;
-            }
-            if last_emit.elapsed().as_millis() >= 60 || count % 20 == 0 {
-                last_emit = std::time::Instant::now();
-                let msg = match maybe_file {
-                    Some(_) => format!("Scanning iPhone media... ({} files found)", count),
-                    None => format!("Scanning folder: {} ({} files found)", folder_or_path, count),
-                };
-                let pct = 10 + std::cmp::min(25, (count as f64 / 150.0).round() as u8);
-                let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-                    stage: "enumerating".to_string(),
-                    message: msg,
-                    current: count,
-                    total: 0,
-                    percent: pct,
-                });
-            }
-        })?;
+        let files = wpd::scan_files(
+            &device_guard,
+            &cancel_scan_flag,
+            |folder_or_path, maybe_file| {
+                if maybe_file.is_some() {
+                    count += 1;
+                }
+                if last_emit.elapsed().as_millis() >= 60 || count % 20 == 0 {
+                    last_emit = std::time::Instant::now();
+                    let msg = match maybe_file {
+                        Some(_) => format!("Scanning iPhone media... ({} files found)", count),
+                        None => format!(
+                            "Scanning folder: {} ({} files found)",
+                            folder_or_path, count
+                        ),
+                    };
+                    let pct = 10 + std::cmp::min(25, (count as f64 / 150.0).round() as u8);
+                    let _ = app_handle.emit(
+                        "scan-progress",
+                        ScanProgressPayload {
+                            stage: "enumerating".to_string(),
+                            message: msg,
+                            current: count,
+                            total: 0,
+                            percent: pct,
+                        },
+                    );
+                }
+            },
+        )?;
 
         if cancel_scan_flag.load(Ordering::Relaxed) {
             return Err("Scan cancelled by user".to_string());
         }
 
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "indexing".to_string(),
-            message: "Indexing local backup directory...".to_string(),
-            current: 0,
-            total: 0,
-            percent: 35,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "indexing".to_string(),
+                message: "Indexing local backup directory...".to_string(),
+                current: 0,
+                total: 0,
+                percent: 35,
+            },
+        );
 
         let mut last_idx_emit = std::time::Instant::now();
-        let backup_index = sync::index_backup_directory(&backup_path, &cancel_scan_flag, |idx_count| {
-            if last_idx_emit.elapsed().as_millis() >= 60 {
-                last_idx_emit = std::time::Instant::now();
-                let pct = 35 + std::cmp::min(28, (idx_count as f64 / 800.0).round() as u8);
-                let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-                    stage: "indexing".to_string(),
-                    message: format!("Indexing local backup directory ({} files scanned)...", idx_count),
-                    current: idx_count,
-                    total: 0,
-                    percent: pct,
-                });
-            }
-        })?;
+        let backup_index =
+            sync::index_backup_directory(&backup_path, &cancel_scan_flag, |idx_count| {
+                if last_idx_emit.elapsed().as_millis() >= 60 {
+                    last_idx_emit = std::time::Instant::now();
+                    let pct = 35 + std::cmp::min(28, (idx_count as f64 / 800.0).round() as u8);
+                    let _ = app_handle.emit(
+                        "scan-progress",
+                        ScanProgressPayload {
+                            stage: "indexing".to_string(),
+                            message: format!(
+                                "Indexing local backup directory ({} files scanned)...",
+                                idx_count
+                            ),
+                            current: idx_count,
+                            total: 0,
+                            percent: pct,
+                        },
+                    );
+                }
+            })?;
 
         if cancel_scan_flag.load(Ordering::Relaxed) {
             return Err("Scan cancelled by user".to_string());
         }
 
         let total_iphone = files.len();
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "classifying".to_string(),
-            message: format!("Comparing {} iPhone files with backup...", total_iphone),
-            current: 0,
-            total: total_iphone,
-            percent: 65,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "classifying".to_string(),
+                message: format!("Comparing {} iPhone files with backup...", total_iphone),
+                current: 0,
+                total: total_iphone,
+                percent: 65,
+            },
+        );
 
         let mut last_cls_emit = std::time::Instant::now();
         let scan_result = sync::diff_and_classify_files(
@@ -169,24 +203,30 @@ async fn scan_device(
                     } else {
                         98
                     };
-                    let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-                        stage: "classifying".to_string(),
-                        message: format!("Comparing files: {} / {} ({}%)", curr, tot, pct),
-                        current: curr,
-                        total: tot,
-                        percent: pct,
-                    });
+                    let _ = app_handle.emit(
+                        "scan-progress",
+                        ScanProgressPayload {
+                            stage: "classifying".to_string(),
+                            message: format!("Comparing files: {} / {} ({}%)", curr, tot, pct),
+                            current: curr,
+                            total: tot,
+                            percent: pct,
+                        },
+                    );
                 }
             },
         )?;
 
-        let _ = app_handle.emit("scan-progress", ScanProgressPayload {
-            stage: "completed".to_string(),
-            message: format!("Scan complete: {} files discovered.", files.len()),
-            current: files.len(),
-            total: files.len(),
-            percent: 100,
-        });
+        let _ = app_handle.emit(
+            "scan-progress",
+            ScanProgressPayload {
+                stage: "completed".to_string(),
+                message: format!("Scan complete: {} files discovered.", files.len()),
+                current: files.len(),
+                total: files.len(),
+                percent: 100,
+            },
+        );
 
         Ok(scan_result)
     })
