@@ -55,5 +55,5 @@ Open an issue using the Feature Request template detailing:
 
 - **Zero Telemetry**: Never introduce network analytics, trackers, or external phone-home requests. This project is 100% offline.
 - **Safety First**: Never overwrite user backup files on disk when byte sizes differ. Always utilize non-destructive renaming (e.g., `<stem>_new.<ext>`).
-- **COM & Windows API**: Keep COM initialization and uninitialization enclosed within `wpd::ComGuard` or safe RAII abstractions.
+- **COM & Windows API**: Keep COM initialization and uninitialization enclosed within `wpd::ComGuard` or safe RAII abstractions, and wrap active MTP device sessions in `wpd::WpdDeviceGuard` to guarantee scoped cleanup with `device.Close()` so devices are never locked.
 - **TypeScript & Serde Synchronization**: Ensure all structs serialized across the Tauri IPC boundary in `src-tauri/src/` have matching interface definitions in `src/types.ts`.
