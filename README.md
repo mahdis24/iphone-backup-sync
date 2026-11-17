@@ -33,9 +33,9 @@
 | **Incremental Sync**                      | **Yes** - indexes destination and copies only new or modified assets                                              | **No** - manual drag-and-drop; re-evaluates all files on every copy                                       | **Partial** - iTunes creates opaque device image; iCloud syncs through cloud                        |
 | **Conflict & Duplicate Handling**         | **Non-destructive** - preserves originals, saves size mismatches as `<stem>_new.<ext>`, skips verified duplicates | **Destructive / Guesswork** - prompts to overwrite or skip without byte verification                      | **Opaque** - overwrites or replaces local files based on cloud cache state                          |
 | **Scan Transparency**                     | **High** - multi-stage real-time progress with live counters for enumeration, backup indexing, and diffing        | **None** - opaque green loading bar without file counts or phase indicators                               | **None** - indeterminate spinning indicator                                                         |
-| **Connection Stability & Crash Recovery** | **High** - atomic `.part` chunked streaming, lockfile crash recovery, and auto-quarantine                         | **Poor** - freezes with _"Catastrophic failure"_ or _"Device unreachable"_, leaving corrupt partial files | **Moderate / Rigid** - fails entire backup batch if a single connection timeout occurs              |
-| **Cancellation & Stop**                   | **Safe & Instant** - dedicated Cancel Scan and Stop Sync buttons; automatically removes partial `.part` fragments  | **Unresponsive** - canceling often hangs Explorer or leaves corrupt truncated files                      | **Slow / Incomplete** - canceling may invalidate local cache or require full restart                |
-| **Granular File Actions**                 | **Yes** - right-click table rows to sync single files or toggle skip status; interactive metric filters           | **Limited** - all-or-nothing Explorer batch queues                                                        | **None** - monolithic sync without individual item controls                                        |
+| **Connection Stability & Crash Recovery** | **High** - atomic `.part` streaming, strict byte verification, and safe lockfile crash recovery                   | **Poor** - freezes with _"Catastrophic failure"_ or _"Device unreachable"_, leaving corrupt partial files | **Moderate / Rigid** - fails entire backup batch if a single connection timeout occurs              |
+| **Cancellation & Stop**                   | **Safe & Instant** - dedicated Cancel Scan and Stop Sync buttons; automatically removes partial `.part` fragments | **Unresponsive** - canceling often hangs Explorer or leaves corrupt truncated files                       | **Slow / Incomplete** - canceling may invalidate local cache or require full restart                |
+| **Granular File Actions**                 | **Yes** - right-click table rows to sync single files or toggle skip status; interactive metric filters           | **Limited** - all-or-nothing Explorer batch queues                                                        | **None** - monolithic sync without individual item controls                                         |
 | **Cloud & Subscription Requirements**     | **Zero** - 100% offline, local direct USB transfer                                                                | **Zero** - offline USB, but hampered by MTP driver stalls                                                 | **Required for Full Library** - requires Apple ID and paid iCloud storage plans for large libraries |
 | **Stuck File Handling**                   | **Instant skip** with <kbd>S</kbd> key; blacklists failing asset without halting batch                            | **Unresponsive** - hangs entire Explorer window; requires killing task or unplugging device               | **Fails entire process** - aborts backup on unreadable files                                        |
 | **Path & Unicode Integrity**              | **Sanitized** - strips invisible iOS Unicode direction markers (`\u{200E}`, `\u{200F}`, etc.)                     | **Unsanitized** - fails path checks or creates phantom folders on NTFS drives                             | **Abstracted** - stored inside proprietary iOS backup database structure                            |
@@ -102,8 +102,11 @@ Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or 
   - `SKIPPED`: Asset is listed in the persistent skip list.
   - `ERROR`: Asset encountered a device read or transfer fault.
 - **Non-Destructive Conflict Resolution:** Size-mismatched files are saved with a `_new` suffix (e.g., `IMG_1234_new.HEIC`). If an identical-sized `_new` file already exists, it is marked as backed up and skipped automatically.
-- **Resilient Chunked Streaming:** Media streams in 64 KB - 256 KB buffers directly into temporary `.part` files, flushing and atomically renaming to final destination only after complete transfer.
-- **Crash Recovery & Lockfile Tracking:** Employs a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs mid-copy, the interrupted file is automatically quarantined to `skip_list.json` on next startup, and partial files are removed.
+- **Resilient Chunked Streaming:** Media streams in 64 KB - 256 KB buffers directly into temporary `.part` files, validating exact byte counts and atomically renaming to final destination only after complete transfer.
+- **Crash Recovery & Lockfile Tracking:** Employs a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs mid-copy, incomplete `.part` fragments are automatically cleaned up on next startup without blacklisting the interrupted asset.
+- **Dynamic Path Resolution & Session Resilience:** Automatically resolves WPD object IDs using hierarchical path lookup and reconnects if an MTP connection resets (such as error `0x8007001F`).
+- **Locale-Agnostic Storage Traversal:** Detects device media containers regardless of Windows display language (German, Spanish, French, etc.) without relying on hardcoded English folder labels.
+- **Case-Insensitive Windows Path Diffing:** Ensures assets with differing file extension or folder casing (such as `.heic` vs `.HEIC` or `100apple` vs `100APPLE`) correctly match existing backups rather than creating duplicate downloads.
 - **Instant Skip Shortcut (<kbd>S</kbd>):** Press <kbd>S</kbd> or click **Skip Current** to immediately drop an in-flight file, delete its partial fragment, add it to `skip_list.json`, and proceed with remaining queue.
 - **Skip List Management:** Full UI interface to inspect blacklisted files, remove specific entries, or clear the entire skip list.
 - **Unicode Path Sanitization:** Strips invisible Unicode direction control markers (`\u{200E}`, `\u{200F}`, `\u{202A}`..=`\u{202E}`) from iOS metadata to ensure valid NTFS paths.
@@ -215,14 +218,14 @@ Compiled binaries and NSIS installer (`.exe`) are output to:
 
 ## Shortcuts & Controls
 
-| Control / Action | Trigger | Purpose |
-| :--- | :--- | :--- |
-| **Row Context Menu** | Right-click table row | Open actions menu ("Sync this file", "Skip file") |
-| **Close Context Menu** | <kbd>Esc</kbd> / Click outside | Dismiss the active context menu |
-| **Skip Current File** | <kbd>S</kbd> / **Skip Current** button | Abort in-flight file, delete `.part` fragment, and add to skip list |
-| **Stop Synchronization** | **Stop Sync** button | Terminate batch transfer immediately and safely purge partial files |
-| **Cancel Scan** | **Cancel Scan** button | Abort ongoing device scan and indexing without freezing |
-| **Category Filters** | Click metric cards / tabs | Filter table by status (`All Pending`, `New`, `Mismatch`, `Failed`, `Skip List`) |
+| Control / Action         | Trigger                                | Purpose                                                                          |
+| :----------------------- | :------------------------------------- | :------------------------------------------------------------------------------- |
+| **Row Context Menu**     | Right-click table row                  | Open actions menu ("Sync this file", "Skip file")                                |
+| **Close Context Menu**   | <kbd>Esc</kbd> / Click outside         | Dismiss the active context menu                                                  |
+| **Skip Current File**    | <kbd>S</kbd> / **Skip Current** button | Abort in-flight file, delete `.part` fragment, and add to skip list              |
+| **Stop Synchronization** | **Stop Sync** button                   | Terminate batch transfer immediately and safely purge partial files              |
+| **Cancel Scan**          | **Cancel Scan** button                 | Abort ongoing device scan and indexing without freezing                          |
+| **Category Filters**     | Click metric cards / tabs              | Filter table by status (`All Pending`, `New`, `Mismatch`, `Failed`, `Skip List`) |
 
 ---
 
