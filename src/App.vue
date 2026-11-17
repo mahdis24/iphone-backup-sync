@@ -146,7 +146,11 @@ async function removeFromSkipList(path: string) {
     // Update local state if file is in scanned list
     const file = scannedFiles.value.find((f) => f.relative_path === path);
     if (file && file.status === 'SKIPPED') {
-      file.status = file.existing_size !== undefined ? 'MISMATCH' : 'NEW';
+      if (file.existing_size !== undefined) {
+        file.status = file.existing_size === file.size ? 'VERIFIED_IGNORED' : 'MISMATCH';
+      } else {
+        file.status = 'NEW';
+      }
       file.error = undefined;
       updateSummaryCounts();
     }
@@ -165,7 +169,11 @@ async function clearAllSkipList() {
     // Reset any skipped files in scan
     for (const f of scannedFiles.value) {
       if (f.status === 'SKIPPED') {
-        f.status = f.existing_size !== undefined ? 'MISMATCH' : 'NEW';
+        if (f.existing_size !== undefined) {
+          f.status = f.existing_size === f.size ? 'VERIFIED_IGNORED' : 'MISMATCH';
+        } else {
+          f.status = 'NEW';
+        }
       }
     }
     updateSummaryCounts();
@@ -519,6 +527,7 @@ onMounted(async () => {
       const f = scannedFiles.value.find((file) => file.relative_path === event.payload.relative_path);
       if (f) {
         f.status = 'VERIFIED_IGNORED';
+        f.existing_size = f.size;
         f.error = undefined;
         updateSummaryCounts();
       }

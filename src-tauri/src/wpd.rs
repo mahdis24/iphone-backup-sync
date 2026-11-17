@@ -43,6 +43,13 @@ pub fn clean_unicode_markers(input: &str) -> String {
         .collect()
 }
 
+/// Compute standard path with .part extension
+pub fn get_part_path(dest_path: &Path) -> std::path::PathBuf {
+    let mut s = dest_path.as_os_str().to_os_string();
+    s.push(".part");
+    std::path::PathBuf::from(s)
+}
+
 /// RAII guard ensuring COM library is initialized for the calling thread and uninitialized on drop.
 pub struct ComGuard;
 
@@ -314,8 +321,13 @@ where
                     || content_type == WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT;
 
                 if is_folder {
-                    // If it's "Internal Storage", don't add "Internal Storage" to relative path so backup stays clean as DCIM/...
-                    let next_rel_path = if clean_name.eq_ignore_ascii_case("Internal Storage") {
+                    // Do not prepend the device functional/storage root (e.g. "Internal Storage",
+                    // localized names like "Almacenamiento interno", or top-level containers under "DEVICE")
+                    let is_storage_root = parent_id == "DEVICE"
+                        || content_type == WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT
+                        || clean_name.eq_ignore_ascii_case("Internal Storage");
+
+                    let next_rel_path = if is_storage_root {
                         current_rel_path.to_string()
                     } else if current_rel_path.is_empty() {
                         clean_name.clone()
@@ -413,10 +425,7 @@ where
         }
 
         // Write to temporary .part file first to protect against incomplete files
-        let part_path = dest_path.with_extension(format!(
-            "{}.part",
-            dest_path.extension().and_then(|s| s.to_str()).unwrap_or("")
-        ));
+        let part_path = get_part_path(dest_path);
 
         let mut file = File::create(&part_path)
             .map_err(|e| format!("Failed to create temporary file {:?}: {}", part_path, e))?;
@@ -459,7 +468,7 @@ where
 
             let now = Instant::now();
             let elapsed_since_last = now.duration_since(last_progress_time).as_secs_f64();
-            if elapsed_since_last >= 0.1 || bytes_copied == expected_size {
+            if elapsed_since_last >= 0.1 || (expected_size > 0 && bytes_copied == expected_size) {
                 let total_elapsed = now.duration_since(start_time).as_secs_f64();
                 let speed_bps = if total_elapsed > 0.0 {
                     bytes_copied as f64 / total_elapsed
@@ -475,6 +484,15 @@ where
             .map_err(|e| format!("Failed to flush file: {}", e))?;
         drop(file);
 
+        // Crucial validation: ensure complete file transfer!
+        if expected_size > 0 && bytes_copied != expected_size {
+            let _ = std::fs::remove_file(&part_path);
+            return Err(format!(
+                "Incomplete transfer: received {} of {} bytes (stream terminated prematurely)",
+                bytes_copied, expected_size
+            ));
+        }
+
         // Rename .part to final destination
         if dest_path.exists() {
             let _ = std::fs::remove_file(dest_path);
@@ -483,6 +501,150 @@ where
             .map_err(|e| format!("Failed to rename {:?} to {:?}: {}", part_path, dest_path, e))?;
 
         Ok(())
+    }
+}
+
+/// Look up an object's current WPD object ID by its relative path (e.g. "DCIM/100APPLE/IMG_1234.JPG").
+/// This acts as a reliable fallback if cached object IDs become stale between scan and transfer sessions.
+pub fn find_object_id_by_path(
+    device: &IPortableDevice,
+    rel_path: &str,
+) -> Result<Option<String>, String> {
+    let clean_rel = clean_unicode_markers(rel_path).replace('\\', "/");
+    let parts: Vec<&str> = clean_rel
+        .split('/')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if parts.is_empty() {
+        return Ok(None);
+    }
+
+    unsafe {
+        let content = device
+            .Content()
+            .map_err(|e| format!("Failed to get device content: {}", e))?;
+        let properties = content
+            .Properties()
+            .map_err(|e| format!("Failed to get content properties: {}", e))?;
+
+        // 1. Locate the storage container under "DEVICE"
+        let parent_id_u16: Vec<u16> = "DEVICE".encode_utf16().chain(std::iter::once(0)).collect();
+        let enum_objects: IEnumPortableDeviceObjectIDs = content
+            .EnumObjects(0, PCWSTR(parent_id_u16.as_ptr()), None)
+            .map_err(|e| format!("Failed to enumerate DEVICE objects: {}", e))?;
+
+        let mut storage_id: Option<String> = None;
+        let mut object_ids: [PWSTR; 16] = [PWSTR::null(); 16];
+        let mut fetched: u32 = 0;
+        let hr = enum_objects.Next(&mut object_ids, &mut fetched);
+        if hr.is_ok() && fetched > 0 {
+            for &obj_pwstr in object_ids.iter().take(fetched as usize) {
+                if !obj_pwstr.is_null() {
+                    let id_str = obj_pwstr.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(obj_pwstr.as_ptr() as *const _));
+                    if storage_id.is_none() && !id_str.is_empty() {
+                        storage_id = Some(id_str);
+                    }
+                }
+            }
+        }
+
+        let storage_id = match storage_id {
+            Some(id) => id,
+            None => return Ok(None),
+        };
+
+        // 2. Traverse down through path segments (e.g. "DCIM" -> "100APPLE" -> "IMG_1234.JPG")
+        let mut current_parent = storage_id;
+        for (i, &segment) in parts.iter().enumerate() {
+            let is_last = i == parts.len() - 1;
+            let current_parent_u16: Vec<u16> = current_parent
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+
+            let enum_sub: IEnumPortableDeviceObjectIDs =
+                match content.EnumObjects(0, PCWSTR(current_parent_u16.as_ptr()), None) {
+                    Ok(e) => e,
+                    Err(_) => return Ok(None),
+                };
+
+            let mut matched_child: Option<(String, bool)> = None;
+
+            loop {
+                let mut sub_ids: [PWSTR; 32] = [PWSTR::null(); 32];
+                let mut sub_fetched: u32 = 0;
+                let sub_hr = enum_sub.Next(&mut sub_ids, &mut sub_fetched);
+                if sub_hr.is_err() || sub_fetched == 0 {
+                    break;
+                }
+
+                for &child_pwstr in sub_ids.iter().take(sub_fetched as usize) {
+                    if child_pwstr.is_null() {
+                        continue;
+                    }
+                    let child_id = child_pwstr.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(child_pwstr.as_ptr() as *const _));
+
+                    if child_id.is_empty() || matched_child.is_some() {
+                        continue;
+                    }
+
+                    let child_u16: Vec<u16> =
+                        child_id.encode_utf16().chain(std::iter::once(0)).collect();
+                    let pc_child = PCWSTR(child_u16.as_ptr());
+
+                    if let Ok(values) = properties.GetValues(pc_child, None) {
+                        let raw_name = match values.GetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
+                            Ok(name_pwstr) => {
+                                let s = name_pwstr.to_string().unwrap_or_default();
+                                CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
+                                s
+                            }
+                            Err(_) => match values.GetStringValue(&WPD_OBJECT_NAME) {
+                                Ok(name_pwstr) => {
+                                    let s = name_pwstr.to_string().unwrap_or_default();
+                                    CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
+                                    s
+                                }
+                                Err(_) => String::new(),
+                            },
+                        };
+
+                        let clean_child_name = clean_unicode_markers(&raw_name);
+                        if clean_child_name.eq_ignore_ascii_case(segment) {
+                            let content_type = values
+                                .GetGuidValue(&WPD_OBJECT_CONTENT_TYPE)
+                                .unwrap_or_default();
+                            let is_folder = content_type == WPD_CONTENT_TYPE_FOLDER
+                                || content_type == WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT;
+                            matched_child = Some((child_id, is_folder));
+                        }
+                    }
+                }
+
+                if matched_child.is_some() || sub_hr == windows::core::HRESULT(1) {
+                    break;
+                }
+            }
+
+            match matched_child {
+                Some((child_id, is_folder)) => {
+                    if is_last {
+                        return Ok(Some(child_id));
+                    }
+                    if !is_folder {
+                        return Ok(None);
+                    }
+                    current_parent = child_id;
+                }
+                None => return Ok(None),
+            }
+        }
+
+        Ok(None)
     }
 }
 

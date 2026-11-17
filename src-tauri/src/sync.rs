@@ -120,32 +120,38 @@ pub fn save_skip_list(storage_dir: &Path, list: &HashSet<String>) -> Result<(), 
     fs::write(&path, json).map_err(|e| format!("Failed to write skip_list.json: {}", e))
 }
 
+pub fn remove_part_file(target_path: &Path) {
+    let part = crate::wpd::get_part_path(target_path);
+    if part.exists() {
+        let _ = fs::remove_file(&part);
+    }
+    let legacy_part = target_path.with_extension(format!(
+        "{}.part",
+        target_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+    ));
+    if legacy_part != part && legacy_part.exists() {
+        let _ = fs::remove_file(&legacy_part);
+    }
+}
+
 pub fn handle_crash_recovery(storage_dir: &Path) -> Option<String> {
     let lock_path = get_lock_file_path(storage_dir);
     if let Ok(content) = fs::read_to_string(&lock_path) {
         if let Ok(info) = serde_json::from_str::<CopyingLockInfo>(&content) {
             let norm_path = normalize_rel_path(&info.relative_path);
-            // Add to skip list
-            let mut list = load_skip_list(storage_dir);
-            list.insert(norm_path.clone());
-            let _ = save_skip_list(storage_dir, &list);
 
             // Clean up any incomplete partial file
             let target = PathBuf::from(&info.target_path);
-            let part_path = target.with_extension(format!(
-                "{}.part",
-                target.extension().and_then(|s| s.to_str()).unwrap_or("")
-            ));
-            if part_path.exists() {
-                let _ = fs::remove_file(&part_path);
-            }
-            let alt_part = PathBuf::from(format!("{}.part", info.target_path));
-            if alt_part.exists() {
-                let _ = fs::remove_file(&alt_part);
-            }
+            remove_part_file(&target);
 
             // Remove the lock file
             let _ = fs::remove_file(&lock_path);
+
+            // Note: DO NOT add to skip_list! An interrupted transfer should NOT
+            // blacklist the user's photo from future syncs.
             return Some(norm_path);
         }
         let _ = fs::remove_file(&lock_path);
@@ -177,11 +183,17 @@ pub fn get_new_variant_rel_path(rel_path: &str) -> String {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupFileInfo {
+    pub actual_relative_path: String,
+    pub size: u64,
+}
+
 pub fn index_backup_directory<F>(
     backup_dir: &Path,
     cancel_flag: &AtomicBool,
     mut on_progress: F,
-) -> Result<HashMap<String, u64>, String>
+) -> Result<HashMap<String, BackupFileInfo>, String>
 where
     F: FnMut(usize),
 {
@@ -200,7 +212,18 @@ where
         }
         if let (Ok(rel), Ok(meta)) = (entry.path().strip_prefix(backup_dir), entry.metadata()) {
             let norm = normalize_rel_path(&rel.to_string_lossy());
-            map.insert(norm, meta.len());
+            // Ignore incomplete .part fragments
+            if norm.ends_with(".part") {
+                continue;
+            }
+            let lower = norm.to_lowercase();
+            map.insert(
+                lower,
+                BackupFileInfo {
+                    actual_relative_path: norm,
+                    size: meta.len(),
+                },
+            );
             count += 1;
             if count % 200 == 0 {
                 on_progress(count);
@@ -214,7 +237,7 @@ where
 
 pub fn diff_and_classify_files<F>(
     iphone_files: &[DeviceFile],
-    backup_index: &HashMap<String, u64>,
+    backup_index: &HashMap<String, BackupFileInfo>,
     storage_dir: &Path,
     cancel_flag: &AtomicBool,
     mut on_progress: F,
@@ -246,11 +269,13 @@ where
         }
 
         let norm_rel = normalize_rel_path(&item.relative_path);
-        let in_skip = skip_set.contains(&norm_rel);
+        let in_skip = skip_set.contains(&norm_rel) || skip_set.contains(&norm_rel.to_lowercase());
 
-        let existing_size = backup_index.get(&norm_rel).copied();
+        let lower_rel = norm_rel.to_lowercase();
+        let existing_entry = backup_index.get(&lower_rel);
+        let existing_size = existing_entry.map(|e| e.size);
 
-        let (status, target_rel_path) = match existing_size {
+        let (status, target_rel_path) = match existing_entry {
             None => {
                 // Case 1: Relative path does not exist in backup -> NEW
                 if in_skip {
@@ -261,24 +286,41 @@ where
                     (FileClassification::New, norm_rel.clone())
                 }
             }
-            Some(ex_size) => {
-                if ex_size == item.size {
-                    // Exact same size already exists in backup
+            Some(existing) => {
+                if existing.size == item.size {
+                    // Exact same size already exists in backup (case-insensitive match)
                     summary.verified_ignored_count += 1;
-                    (FileClassification::VerifiedIgnored, norm_rel.clone())
+                    (
+                        FileClassification::VerifiedIgnored,
+                        existing.actual_relative_path.clone(),
+                    )
                 } else {
                     // Size differs.
-                    // Crucial Rule: Check if a `_new` variant (e.g. IMG_1234_new.HEIC)
+                    // Check if a `_new` variant (e.g. IMG_1234_new.HEIC)
                     // already exists in the same backup folder with the EXACT same byte size as the iPhone file.
                     let new_variant_rel = get_new_variant_rel_path(&norm_rel);
-                    let variant_size = backup_index.get(&new_variant_rel).copied();
+                    let lower_variant = new_variant_rel.to_lowercase();
+                    let variant_entry = backup_index.get(&lower_variant);
 
-                    if variant_size == Some(item.size) {
-                        // Verified _new variant already exists with exact same size -> ignore/skip completely
-                        summary.verified_ignored_count += 1;
-                        (FileClassification::VerifiedIgnored, new_variant_rel)
+                    if let Some(v_info) = variant_entry {
+                        if v_info.size == item.size {
+                            // Verified _new variant already exists with exact same size -> ignore/skip completely
+                            summary.verified_ignored_count += 1;
+                            (
+                                FileClassification::VerifiedIgnored,
+                                v_info.actual_relative_path.clone(),
+                            )
+                        } else {
+                            // Mark as MISMATCH and write directly to <filename>_new.<ext>
+                            if in_skip {
+                                summary.skipped_count += 1;
+                                (FileClassification::Skipped, new_variant_rel)
+                            } else {
+                                summary.mismatch_count += 1;
+                                (FileClassification::Mismatch, new_variant_rel)
+                            }
+                        }
                     } else {
-                        // Mark as MISMATCH and write directly to <filename>_new.<ext>
                         if in_skip {
                             summary.skipped_count += 1;
                             (FileClassification::Skipped, new_variant_rel)
@@ -344,7 +386,7 @@ where
     F: FnMut(SyncProgressPayload),
 {
     // Connect to device
-    let device = crate::wpd::open_device(device_pnp_id)?;
+    let mut device = crate::wpd::open_device(device_pnp_id)?;
 
     let total_files = files_to_sync.len();
     let lock_path = get_lock_file_path(storage_dir);
@@ -401,9 +443,10 @@ where
             error: None,
         });
 
-        let stream_res = stream_file_to_disk(
+        let mut active_obj_id = file_item.object_id.clone();
+        let mut stream_res = stream_file_to_disk(
             &device,
-            &file_item.object_id,
+            &active_obj_id,
             &dest_path,
             file_item.size,
             &controller.abort_or_skip_flag,
@@ -423,28 +466,59 @@ where
             },
         );
 
+        // If transfer failed not due to user abort, try resolving fresh object ID or reconnecting
+        if let Err(ref err) = stream_res
+            && !controller.abort_or_skip_flag.load(Ordering::Relaxed)
+            && !controller.cancel_sync_flag.load(Ordering::Relaxed)
+        {
+            let is_conn_err = err.contains("0x8007001F")
+                || err.contains("0x80070015")
+                || err.contains("Failed to get device content")
+                || err.contains("Failed to get IPortableDeviceResources");
+
+            if is_conn_err {
+                // Try to re-open the device connection
+                if let Ok(new_dev) = crate::wpd::open_device(device_pnp_id) {
+                    device = new_dev;
+                }
+            }
+
+            // If object id was stale or stream failed, attempt to locate object by its relative path
+            if let Ok(Some(fresh_id)) =
+                crate::wpd::find_object_id_by_path(&device, &file_item.relative_path)
+            {
+                active_obj_id = fresh_id;
+                stream_res = stream_file_to_disk(
+                    &device,
+                    &active_obj_id,
+                    &dest_path,
+                    file_item.size,
+                    &controller.abort_or_skip_flag,
+                    |copied, total, speed| {
+                        on_progress(SyncProgressPayload {
+                            current_file_index: index + 1,
+                            total_files,
+                            filename: file_item.filename.clone(),
+                            relative_path: file_item.relative_path.clone(),
+                            bytes_copied: copied,
+                            total_bytes: total,
+                            status: "copying".to_string(),
+                            speed_bytes_sec: speed,
+                            error: None,
+                        });
+                        Ok(())
+                    },
+                );
+            }
+        }
+
         // Always clean up lock file after file finishes, fails, or cancels
         let _ = fs::remove_file(&lock_path);
-
-        // Helper to remove any leftover partial file for this target
-        let clean_part_file = || {
-            let part_path = dest_path.with_extension(format!(
-                "{}.part",
-                dest_path.extension().and_then(|s| s.to_str()).unwrap_or("")
-            ));
-            if part_path.exists() {
-                let _ = fs::remove_file(&part_path);
-            }
-            let alt_part = PathBuf::from(format!("{}.part", dest_path.to_string_lossy()));
-            if alt_part.exists() {
-                let _ = fs::remove_file(&alt_part);
-            }
-        };
 
         // Check if user requested cancellation of the whole sync
         if controller.cancel_sync_flag.load(Ordering::Relaxed) {
             was_cancelled = true;
-            clean_part_file();
+            remove_part_file(&dest_path);
             // DO NOT add to skip list! This was a stop/cancel, not a skip.
             on_progress(SyncProgressPayload {
                 current_file_index: index + 1,
@@ -475,7 +549,7 @@ where
                 });
             }
             Err(err) => {
-                clean_part_file();
+                remove_part_file(&dest_path);
 
                 let is_skipped = err.contains("Aborted")
                     || controller.abort_or_skip_flag.load(Ordering::Relaxed);
