@@ -16,6 +16,11 @@
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
 </p>
 
+<p>
+  <a href="https://www.producthunt.com/products/iphone-backup-sync?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-iphone-backup-sync" target="_blank" rel="noopener noreferrer"><img alt="iphone-backup-sync - Fast, incremental iPhone DCIM backup for Windows via USB | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1316271&amp;theme=light&amp;t=1795116065635" /></a>
+  <a href="https://trendshift.io/repositories/355344?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-355344" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/355344/daily?language=Vue" alt="mahdis24%2Fiphone-backup-sync | Trendshift" width="250" height="55" /></a>
+</p>
+
 ### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
 
 </div>
