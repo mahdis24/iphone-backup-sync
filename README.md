@@ -5,18 +5,20 @@
 # iPhone Backup Sync
 
 <p>
-  <a href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"><img src="https://img.shields.io/github/v/release/mahdis24/iphone-backup-sync?color=24C8D5&label=Release&logo=github" alt="GitHub Release" /></a>
+  <a href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"><img src="https://img.shields.io/github/v/release/mahdis24/iphone-backup-sync?color=0891B2&label=Release&logo=github" alt="GitHub Release" /></a>
   <a href="https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml"><img src="https://github.com/mahdis24/iphone-backup-sync/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Platform" /></a>
   <br />
-  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-v2-24C8D5?logo=tauri&logoColor=white" alt="Tauri v2" /></a>
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024%20Edition-dea584?logo=rust&logoColor=white" alt="Rust" /></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-v2-0891B2?logo=tauri&logoColor=white" alt="Tauri v2" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2024%20Edition-B7410E?logo=rust&logoColor=white" alt="Rust" /></a>
   <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js&logoColor=white" alt="Vue 3" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
 </p>
 
-### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
+<a href="https://mahdis24.tech/iphone-backup-sync/"><img src="https://img.shields.io/badge/Website-mahdis24.tech%2Fiphone--backup--sync-0891B2?logo=googlechrome&logoColor=white" alt="Official Website" /></a>
+
+<a href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20Release%20(.exe)-2EA44F?logo=github&logoColor=white" alt="Download Latest Release" /></a>
 
 </div>
 
