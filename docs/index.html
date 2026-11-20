@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('color-scheme')
+        if (savedTheme) {
+          document.querySelector('meta[name="color-scheme"]').content =
+            savedTheme
+        }
+      } catch (e) {}
+    </script>
+
+    <title>
+      iPhone Backup Sync - Fast, Incremental iPhone DCIM Media Backup for
+      Windows
+    </title>
+    <meta
+      name="description"
+      content="A fast, lightweight Windows desktop app built with Tauri v2 and Rust that incrementally backs up iPhone DCIM photos and videos to external storage without duplicates or overwrites. 100% offline and private." />
+    <meta
+      name="keywords"
+      content="iphone backup, windows iphone backup, dcim sync, iphone photos to external drive, tauri rust iphone, photo backup windows, no itunes backup, non-destructive backup" />
+    <meta name="author" content="Mahdi Salek" />
+    <link
+      rel="canonical"
+      href="https://mahdis24.github.io/iphone-backup-sync/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://mahdis24.github.io/iphone-backup-sync/" />
+    <meta
+      property="og:title"
+      content="iPhone Backup Sync - Fast, Incremental iPhone Media Backup for Windows" />
+    <meta
+      property="og:description"
+      content="Lightweight Windows desktop application that incrementally backs up iPhone DCIM photos and videos directly over USB. Zero cloud, zero overwrite, 100% offline." />
+    <meta
+      property="og:image"
+      content="https://mahdis24.github.io/iphone-backup-sync/assets/logo.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:url"
+      content="https://mahdis24.github.io/iphone-backup-sync/" />
+    <meta
+      name="twitter:title"
+      content="iPhone Backup Sync - Fast, Incremental iPhone Media Backup for Windows" />
+    <meta
+      name="twitter:description"
+      content="Lightweight Windows desktop application that incrementally backs up iPhone DCIM photos and videos directly over USB. Zero cloud, zero overwrite, 100% offline." />
+    <meta
+      name="twitter:image"
+      content="https://mahdis24.github.io/iphone-backup-sync/assets/logo.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon.png" />
+    <link rel="apple-touch-icon" href="assets/logo.png" />
+
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Header / Navigation -->
+    <header class="site-header" id="top">
+      <div class="container header-container">
+        <a href="#top" class="brand" aria-label="iPhone Backup Sync Home">
+          <img
+            src="assets/logo.png"
+            alt="iPhone Backup Sync Logo"
+            width="36"
+            height="36"
+            class="brand-logo" />
+          <span class="brand-text">iPhone Backup Sync</span>
+        </a>
+
+        <nav class="site-nav" id="site-nav" aria-label="Main Navigation">
+          <ul class="nav-list">
+            <li><a href="#features" class="nav-link">Features</a></li>
+            <li><a href="#comparison" class="nav-link">Comparison</a></li>
+            <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+            <li><a href="#requirements" class="nav-link">Requirements</a></li>
+            <li><a href="#download" class="nav-link">Download</a></li>
+          </ul>
+        </nav>
+
+        <div class="header-actions">
+          <!-- Theme Toggle -->
+          <button
+            type="button"
+            class="theme-toggle-btn"
+            id="theme-toggle"
+            aria-label="Toggle color theme"
+            title="Toggle dark / light theme">
+            <svg
+              class="theme-icon icon-sun"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg
+              class="theme-icon icon-moon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+
+          <!-- GitHub Link with Live Star Count -->
+          <a
+            href="https://github.com/mahdis24/iphone-backup-sync"
+            class="github-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub Repository">
+            <svg
+              class="github-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+            </svg>
+            <span class="github-btn-label">GitHub</span>
+            <span
+              class="github-stars"
+              id="gh-stars"
+              aria-label="GitHub stars count"
+              >★ Star</span
+            >
+          </a>
+
+          <!-- Mobile Menu Toggle Button -->
+          <button
+            type="button"
+            class="mobile-menu-btn"
+            id="mobile-toggle"
+            aria-expanded="false"
+            aria-controls="site-nav"
+            aria-label="Toggle navigation menu">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="container hero-container">
+        <div class="hero-badge-wrap">
+          <span class="badge badge-accent">Windows 10 / 11 Native</span>
+          <span class="badge badge-subtle">Tauri v2 + Rust</span>
+          <span class="badge badge-success">100% Offline &amp; Private</span>
+        </div>
+
+        <h1 class="hero-title">Fast, Incremental iPhone Backups for Windows</h1>
+
+        <p class="hero-subtitle">
+          Directly back up DCIM photos and videos over USB to external drives or
+          local disks. Skips already backed-up files, handles size conflicts
+          without overwriting, and operates completely offline with zero
+          subscriptions or iTunes bloat.
+        </p>
+
+        <div class="hero-cta-group">
+          <a
+            href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"
+            class="btn btn-primary btn-lg"
+            id="primary-download-btn">
+            <svg
+              class="btn-icon"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <div class="btn-text-block">
+              <span class="btn-main-text">Download for Windows</span>
+              <span class="btn-sub-text" id="release-meta-text"
+                >Latest Release (.exe)</span
+              >
+            </div>
+          </a>
+
+          <a
+            href="https://github.com/mahdis24/iphone-backup-sync"
+            class="btn btn-secondary btn-lg"
+            target="_blank"
+            rel="noopener noreferrer">
+            <svg
+              class="btn-icon"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+            </svg>
+            <span class="btn-main-text">View Source on GitHub</span>
+          </a>
+        </div>
+
+        <div class="hero-assurances">
+          <span class="assurance-item">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Free &amp; Open Source (MIT)
+          </span>
+          <span class="assurance-dot">•</span>
+          <span class="assurance-item">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Zero Telemetry or Cloud Calls
+          </span>
+          <span class="assurance-dot">•</span>
+          <span class="assurance-item">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            No Apple ID or Subscription
+          </span>
+        </div>
+
+        <!-- App Preview Window Mockup (Windows 11 Style) -->
+        <div class="preview-frame-wrap">
+          <div class="win-window">
+            <div class="win-titlebar">
+              <div class="win-titlebar-left">
+                <img
+                  src="assets/favicon.png"
+                  alt=""
+                  width="16"
+                  height="16"
+                  class="win-app-icon"
+                  aria-hidden="true" />
+                <span class="win-title-text">iPhone Backup Sync</span>
+              </div>
+              <div class="win-caption-controls" aria-hidden="true">
+                <div class="win-control win-minimize" title="Minimize">
+                  <svg width="10" height="10" viewBox="0 0 10 10">
+                    <line
+                      x1="0"
+                      y1="5"
+                      x2="10"
+                      y2="5"
+                      stroke="currentColor"
+                      stroke-width="1"></line>
+                  </svg>
+                </div>
+                <div class="win-control win-maximize" title="Maximize">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <rect
+                      x="0.5"
+                      y="0.5"
+                      width="9"
+                      height="9"
+                      stroke="currentColor"
+                      stroke-width="1"></rect>
+                  </svg>
+                </div>
+                <div class="win-control win-close" title="Close">
+                  <svg width="10" height="10" viewBox="0 0 10 10">
+                    <line
+                      x1="0.5"
+                      y1="0.5"
+                      x2="9.5"
+                      y2="9.5"
+                      stroke="currentColor"
+                      stroke-width="1.1"></line>
+                    <line
+                      x1="9.5"
+                      y1="0.5"
+                      x2="0.5"
+                      y2="9.5"
+                      stroke="currentColor"
+                      stroke-width="1.1"></line>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div class="win-window-body">
+              <img
+                src="screenshots/preview.png"
+                alt="iPhone Backup Sync application screenshot showing scan progress, metrics, and file table"
+                width="1280"
+                height="800"
+                loading="eager"
+                class="preview-image" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key Features Grid -->
+    <section class="section features-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow">Key Features</span>
+          <h2 class="section-title">Engineered for Rock-Solid Reliability</h2>
+          <p class="section-subtitle">
+            Designed specifically to overcome Windows File Explorer MTP stalls,
+            incomplete transfers, and opaque iTunes device images.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <!-- Feature 1 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-cyan">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path
+                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Incremental Smart Sync</h3>
+            <p class="feature-desc">
+              Scans your destination drive and compares against DCIM files by
+              exact byte size and path. Only new or modified media files are
+              copied, skipping already backed-up items instantly.
+            </p>
+          </article>
+
+          <!-- Feature 2 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-emerald">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 12 11 14 15 10"></polyline>
+              </svg>
+            </div>
+            <h3 class="feature-title">Zero Overwrite Protection</h3>
+            <p class="feature-desc">
+              Never destroys original backup files. If an asset exists with
+              matching name but mismatched size, it is safely preserved with a
+              <code>_new</code> suffix (e.g. <code>IMG_1234_new.HEIC</code>).
+            </p>
+          </article>
+
+          <!-- Feature 3 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-blue">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <polygon
+                  points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+            <h3 class="feature-title">Direct WPD &amp; Rust Engine</h3>
+            <p class="feature-desc">
+              Directly calls the Windows Portable Devices COM subsystem
+              (<code>IPortableDevice</code>, <code>IStream</code>) from native
+              Rust. Prevents Windows Explorer shell locks and "Device
+              unreachable" stalls.
+            </p>
+          </article>
+
+          <!-- Feature 4 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-amber">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">100% Local, Offline &amp; Private</h3>
+            <p class="feature-desc">
+              Direct USB transfer straight to your external SSD or internal
+              storage. Operates completely air-gapped without telemetry,
+              background network calls, or third-party accounts.
+            </p>
+          </article>
+
+          <!-- Feature 5 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-purple">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </div>
+            <h3 class="feature-title">Atomic Streaming &amp; Crash Recovery</h3>
+            <p class="feature-desc">
+              Streams media in 64 KB - 256 KB chunks into temporary
+              <code>.part</code> files, atomically renaming only when verified.
+              Accidental cable disconnects or crashes clean up automatically on
+              restart.
+            </p>
+          </article>
+
+          <!-- Feature 6 -->
+          <article class="feature-card">
+            <div class="feature-icon-wrap icon-rose">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                <path d="M10 9l5 3-5 3V9z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Granular Actions &amp; Skip Shortcut</h3>
+            <p class="feature-desc">
+              Encounter a damaged or unreadable file? Press <kbd>S</kbd> to
+              immediately skip the failing asset and clean up its fragment
+              without aborting the queue. Right-click individual rows to sync
+              single files.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Table Section -->
+    <section class="section comparison-section" id="comparison">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow">Why It Matters</span>
+          <h2 class="section-title">Comparison with Alternative Approaches</h2>
+          <p class="section-subtitle">
+            See how iPhone Backup Sync delivers faster, safer, and cleaner
+            backups than standard Windows and Apple tools.
+          </p>
+        </div>
+
+        <div class="table-container">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th scope="col" class="col-feature">Feature / Capability</th>
+                <th scope="col" class="col-app highlight-col">
+                  iPhone Backup Sync
+                </th>
+                <th scope="col" class="col-alt">Windows File Explorer</th>
+                <th scope="col" class="col-alt">iTunes / iCloud for Windows</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" class="row-label">Incremental Sync</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Yes</strong> - indexes
+                  destination and transfers only new files
+                </td>
+                <td>
+                  <span class="badge-status error">No</span> - manual
+                  drag-and-drop; copies everything or asks on each file
+                </td>
+                <td>
+                  <span class="badge-status warning">Partial</span> - iTunes
+                  creates opaque backup image; iCloud requires internet
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">Conflict Handling</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Non-destructive</strong>
+                  - preserves originals, appends <code>_new</code>
+                </td>
+                <td>
+                  <span class="badge-status error">Destructive</span> -
+                  overwrite prompt without byte inspection
+                </td>
+                <td>
+                  <span class="badge-status warning">Opaque</span> - overwrites
+                  or hides based on cloud cache
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">Progress Transparency</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Real-Time</strong> -
+                  exact stages, file count, throughput (MB/s)
+                </td>
+                <td>
+                  <span class="badge-status error">None</span> - green loading
+                  bar with generic estimates
+                </td>
+                <td>
+                  <span class="badge-status warning">Minimal</span> -
+                  indeterminate spinning wheel
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">
+                  MTP Stability &amp; Recovery
+                </th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">High</strong> - atomic
+                  <code>.part</code> streaming &amp; lockfile tracking
+                </td>
+                <td>
+                  <span class="badge-status error">Poor</span> - stalls with
+                  "Device unreachable", corrupts fragments
+                </td>
+                <td>
+                  <span class="badge-status warning">Rigid</span> - single
+                  timeout aborts whole batch
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">Stuck File Handling</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Instant Skip</strong> -
+                  press <kbd>S</kbd> to bypass without halting batch
+                </td>
+                <td>
+                  <span class="badge-status error">Freezes</span> - hangs whole
+                  Explorer window; requires unplugging
+                </td>
+                <td>
+                  <span class="badge-status error">Fails</span> - aborts entire
+                  backup batch on unreadable items
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">Cloud &amp; Subscription</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Zero</strong> - 100%
+                  offline, local direct USB transfer
+                </td>
+                <td>
+                  <strong class="badge-status success">Zero</strong> - offline
+                  USB, but hampered by MTP driver stalls
+                </td>
+                <td>
+                  <span class="badge-status error">Paid Plans</span> - full
+                  camera roll requires monthly 2TB iCloud
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="row-label">Direct File Access</th>
+                <td class="highlight-col">
+                  <strong class="badge-status success">Standard Folders</strong>
+                  - direct access to standard JPG, HEIC, MP4, MOV
+                </td>
+                <td>
+                  <strong class="badge-status success">Standard Folders</strong>
+                  - if the Explorer copy finishes without hanging
+                </td>
+                <td>
+                  <span class="badge-status error">Proprietary DB</span> -
+                  hashed file manifests, unreadable in Explorer
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="section steps-section" id="how-it-works">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow">Workflow</span>
+          <h2 class="section-title">Back Up Your Camera Roll in 3 Steps</h2>
+          <p class="section-subtitle">
+            Clean, straightforward workflow designed for quick daily or weekly
+            photo library archival.
+          </p>
+        </div>
+
+        <div class="steps-grid">
+          <!-- Step 1 -->
+          <div class="step-card">
+            <div class="step-badge">1</div>
+            <h3 class="step-title">Connect Your iPhone</h3>
+            <p class="step-desc">
+              Connect your iPhone to your Windows PC via USB cable. Unlock the
+              device and tap <strong>Trust This Computer</strong> if prompted.
+              The app automatically detects your connected iPhone.
+            </p>
+            <div class="step-tip">
+              <strong>Tip:</strong> In iPhone Settings &gt; Photos &gt; Transfer
+              to Mac or PC, select <em>Keep Originals</em> to avoid iOS
+              on-the-fly transcoding stalls.
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-card">
+            <div class="step-badge">2</div>
+            <h3 class="step-title">Select Backup Drive</h3>
+            <p class="step-desc">
+              Click <strong>Browse...</strong> to select any destination
+              directory on your internal storage, external SSD, or network
+              drive. The app builds an index of previously backed up files.
+            </p>
+            <div class="step-tip">
+              <strong>Safe:</strong> The destination is never wiped or
+              overwritten. Existing files remain untouched.
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-card">
+            <div class="step-badge">3</div>
+            <h3 class="step-title">Scan &amp; Incremental Sync</h3>
+            <p class="step-desc">
+              Click <strong>Scan iPhone</strong> to inspect classified media:
+              <code>NEW</code>, <code>MISMATCH</code>, and
+              <code>VERIFIED IGNORED</code>. Then click
+              <strong>Start Sync</strong> to copy all pending assets at high
+              speed.
+            </p>
+            <div class="step-tip">
+              <strong>Controls:</strong> Press <kbd>S</kbd> to skip unreadable
+              files or stop sync safely at any time.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recommended Setting Callout -->
+    <section class="section callout-section">
+      <div class="container">
+        <div class="callout-card">
+          <div class="callout-icon-col">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <div class="callout-content-col">
+            <h3 class="callout-title">
+              Recommended iPhone Setting: Keep Originals
+            </h3>
+            <p class="callout-text">
+              To prevent iOS from crashing mid-transfer over USB, open
+              <strong>Settings</strong> on your iPhone, navigate to
+              <strong>Photos</strong>, scroll to the bottom under
+              <strong>Transfer to Mac or PC</strong>, and select
+              <strong>Keep Originals</strong>.
+            </p>
+            <p class="callout-subtext">
+              This prevents iOS from attempting on-the-fly HEIC to JPEG or
+              ProRes to H.264 transcoding, which is the primary cause of Windows
+              MTP timeouts and disconnected device errors.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Requirements & Open Source Info Section -->
+    <section class="section requirements-section" id="requirements">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow">Open Source &amp; Requirements</span>
+          <h2 class="section-title">
+            Transparent, Secure, and Community-Driven
+          </h2>
+          <p class="section-subtitle">
+            Everything you need to know about system requirements, open-source
+            security, and installation.
+          </p>
+        </div>
+
+        <div class="info-grid">
+          <!-- Requirements Card -->
+          <div class="info-card">
+            <div class="info-card-header">
+              <svg
+                class="info-icon"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              <h3 class="info-title">System Requirements</h3>
+            </div>
+            <ul class="info-list">
+              <li>
+                <strong>Operating System:</strong> Windows 10 or Windows 11
+                (64-bit).
+              </li>
+              <li>
+                <strong>Connection:</strong> Standard Lightning or USB-C cable
+                (high quality cable recommended for fast transfer).
+              </li>
+              <li>
+                <strong>Device Driver:</strong> Apple Mobile Device Support
+                (installed automatically by iTunes, Apple Devices app, or
+                standard Windows Update).
+              </li>
+              <li>
+                <strong>Resource Footprint:</strong> Under 60 MB RAM during
+                active transfers thanks to lightweight Rust &amp; Tauri v2
+                architecture.
+              </li>
+            </ul>
+          </div>
+
+          <!-- Windows SmartScreen Guidance Card -->
+          <div class="info-card">
+            <div class="info-card-header">
+              <svg
+                class="info-icon"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <h3 class="info-title">Windows SmartScreen Note</h3>
+            </div>
+            <p class="info-text">
+              When running the installer for the first time, Windows Defender
+              SmartScreen may display an <em>"Unknown Publisher"</em> dialog.
+            </p>
+            <div class="smartscreen-steps">
+              <ol>
+                <li>
+                  Click <strong>More info</strong> on the Windows SmartScreen
+                  dialog.
+                </li>
+                <li>
+                  Click <strong>Run anyway</strong> to launch the installer.
+                </li>
+              </ol>
+            </div>
+            <p class="info-subtext">
+              <strong>Why does this appear?</strong> Extended Validation (EV)
+              code-signing certificates require costly commercial subscriptions
+              ($400-$700/year). As an independent open-source project, all
+              binaries are built transparently via GitHub Actions from auditable
+              source code.
+            </p>
+          </div>
+        </div>
+
+        <!-- Build from Source Block -->
+        <div class="code-showcase-card">
+          <div class="code-card-header">
+            <div class="code-meta">
+              <span class="code-badge">Terminal</span>
+              <span class="code-title"
+                >Build from Source (Bun or npm + Rust)</span
+              >
+            </div>
+            <span class="copy-container">
+              <button
+                type="button"
+                class="copy-button"
+                command="--copy"
+                commandfor="build-instructions-code"
+                aria-label="Copy build commands">
+                <svg
+                  class="icon icon-copy"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <svg
+                  class="icon icon-check"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+              <span class="tip" role="status"></span>
+            </span>
+          </div>
+          <pre><code id="build-instructions-code">git clone https://github.com/mahdis24/iphone-backup-sync.git
+cd iphone-backup-sync
+bun install
+bun run tauri build</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download & Final CTA Section -->
+    <section class="section download-section" id="download">
+      <div class="container">
+        <div class="download-card">
+          <div class="download-content">
+            <h2 class="download-heading">Start Backing Up Your iPhone Today</h2>
+            <p class="download-subheading">
+              Download the latest Windows installer or standalone executable.
+              Free, open-source, and ready in seconds.
+            </p>
+
+            <div class="download-action-group">
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"
+                class="btn btn-primary btn-xl"
+                id="footer-download-btn">
+                <svg
+                  class="btn-icon"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <div class="btn-text-block">
+                  <span class="btn-main-text">Download for Windows</span>
+                  <span class="btn-sub-text" id="footer-release-meta"
+                    >Latest Release (.exe)</span
+                  >
+                </div>
+              </a>
+
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/releases"
+                class="btn btn-ghost btn-xl"
+                target="_blank"
+                rel="noopener noreferrer">
+                View All Releases &amp; Changelog
+              </a>
+            </div>
+
+            <div class="download-meta-info">
+              <span>Supports Windows 10 &amp; 11 (64-bit)</span>
+              <span class="meta-dot">•</span>
+              <span>Distributed under MIT License</span>
+              <span class="meta-dot">•</span>
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Report an Issue</a
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="container footer-container">
+        <div class="footer-brand-col">
+          <div class="footer-brand">
+            <img
+              src="assets/logo.png"
+              alt="iPhone Backup Sync Logo"
+              width="28"
+              height="28"
+              class="footer-logo" />
+            <span class="footer-brand-name">iPhone Backup Sync</span>
+          </div>
+          <p class="footer-tagline">
+            Fast, incremental local iPhone DCIM backup for Windows via USB. Zero
+            cloud, zero subscriptions.
+          </p>
+        </div>
+
+        <div class="footer-nav-col">
+          <h4 class="footer-nav-title">Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#comparison">Comparison</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#requirements">Requirements</a></li>
+            <li><a href="#download">Download</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <h4 class="footer-nav-title">Community &amp; Code</h4>
+          <ul class="footer-links">
+            <li>
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync"
+                target="_blank"
+                rel="noopener noreferrer"
+                >GitHub Repository</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Releases &amp; Assets</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Issue Tracker</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/mahdis24/iphone-backup-sync/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+                >MIT License</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="container footer-bottom">
+        <p class="copyright-text">
+          Built by
+          <a
+            href="https://mahdis24.tech"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Mahdi Salek</a
+          >. Released under the open-source MIT License.
+        </p>
+        <p class="footer-disclaimer">
+          iPhone, iOS, iTunes, and Apple are trademarks of Apple Inc.,
+          registered in the U.S. and other countries. This project is an
+          independent open-source tool and is not affiliated with or endorsed by
+          Apple Inc.
+        </p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
