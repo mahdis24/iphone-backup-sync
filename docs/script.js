@@ -140,13 +140,15 @@
       }
 
       if (windowsAsset && windowsAsset.browser_download_url) {
-        const downloadUrl = windowsAsset.browser_download_url
-        if (primaryDownloadBtn) primaryDownloadBtn.href = downloadUrl
-        if (footerDownloadBtn) footerDownloadBtn.href = downloadUrl
+        const downloadUrl = windowsAsset.browser_download_url;
+        if (primaryDownloadBtn) primaryDownloadBtn.href = downloadUrl;
+        if (footerDownloadBtn) footerDownloadBtn.href = downloadUrl;
+        const mobileDlBtn = document.querySelector('.mobile-download-btn');
+        if (mobileDlBtn) mobileDlBtn.href = downloadUrl;
       }
 
-      if (releaseMetaText) releaseMetaText.textContent = metaLabel
-      if (footerReleaseMeta) footerReleaseMeta.textContent = metaLabel
+      if (releaseMetaText) releaseMetaText.textContent = metaLabel;
+      if (footerReleaseMeta) footerReleaseMeta.textContent = metaLabel;
     } catch {
       // Gracefully silent fallback to default GitHub releases link
     }
@@ -155,27 +157,29 @@
   // ---------------------------------------------------------------------------
   // 3. Dynamic GitHub Stars Count Fetcher
   // ---------------------------------------------------------------------------
-  const ghStarsBadge = document.getElementById('gh-stars')
-
   function formatStarCount(stars) {
     if (stars >= 1000) {
-      return `★ ${(stars / 1000).toFixed(1)}k`
+      return `★ ${(stars / 1000).toFixed(1)}k`;
     }
-    return `★ ${stars}`
+    return `★ ${stars}`;
   }
 
   async function fetchRepoStars() {
-    if (!ghStarsBadge) return
+    const starBadges = document.querySelectorAll('.github-stars');
+    if (starBadges.length === 0) return;
     try {
       const response = await fetch(REPO_API_URL, {
-        headers: { Accept: 'application/vnd.github.v3+json' }
-      })
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
 
-      if (!response.ok) return
+      if (!response.ok) return;
 
-      const data = await response.json()
+      const data = await response.json();
       if (typeof data.stargazers_count === 'number') {
-        ghStarsBadge.textContent = formatStarCount(data.stargazers_count)
+        const formatted = formatStarCount(data.stargazers_count);
+        starBadges.forEach((badge) => {
+          badge.textContent = formatted;
+        });
       }
     } catch {
       // Keep static text if request fails or rate-limited
@@ -304,10 +308,28 @@
         !siteNav.contains(event.target) &&
         !mobileToggleBtn.contains(event.target)
       ) {
-        siteNav.classList.remove('is-open')
-        mobileToggleBtn.setAttribute('aria-expanded', 'false')
+        siteNav.classList.remove('is-open');
+        mobileToggleBtn.setAttribute('aria-expanded', 'false');
       }
-    })
+    });
+
+    // Close when pressing Escape key
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && siteNav.classList.contains('is-open')) {
+        siteNav.classList.remove('is-open');
+        mobileToggleBtn.setAttribute('aria-expanded', 'false');
+        mobileToggleBtn.focus();
+      }
+    });
+
+    // Close mobile nav automatically on viewport expansion to desktop
+    const desktopMedia = window.matchMedia('(min-width: 861px)');
+    desktopMedia.addEventListener('change', (e) => {
+      if (e.matches && siteNav.classList.contains('is-open')) {
+        siteNav.classList.remove('is-open');
+        mobileToggleBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------

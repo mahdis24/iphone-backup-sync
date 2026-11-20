@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
 
     <script>
@@ -87,6 +89,38 @@
             <li><a href="#requirements" class="nav-link">Requirements</a></li>
             <li><a href="#download" class="nav-link">Download</a></li>
           </ul>
+
+          <div class="mobile-nav-actions">
+            <a
+              href="https://github.com/mahdis24/iphone-backup-sync"
+              class="github-btn mobile-github-btn"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub Repository">
+              <svg
+                class="github-icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+              </svg>
+              <span class="github-btn-label">Star on GitHub</span>
+              <span class="github-stars" aria-label="GitHub stars count"
+                >★ Star</span
+              >
+            </a>
+
+            <a
+              href="https://github.com/mahdis24/iphone-backup-sync/releases/latest"
+              class="btn btn-primary mobile-download-btn">
+              Download for Windows
+            </a>
+          </div>
         </nav>
 
         <div class="header-actions">
@@ -186,7 +220,9 @@
           <span class="badge badge-success">100% Offline &amp; Private</span>
         </div>
 
-        <h1 class="hero-title">Fast, Incremental iPhone Backups for Windows</h1>
+        <h1 class="hero-title">
+          Fast & Incremental iPhone Backups<br />for Windows
+        </h1>
 
         <p class="hero-subtitle">
           Directly back up DCIM photos and videos over USB to external drives or
@@ -546,7 +582,12 @@
           </p>
         </div>
 
-        <div class="table-container">
+        <!-- Desktop Table View (visible on screens >= 861px) -->
+        <div
+          class="desktop-table-container"
+          tabindex="0"
+          role="region"
+          aria-label="Feature comparison between iPhone Backup Sync and alternative tools">
           <table class="comparison-table">
             <thead>
               <tr>
@@ -668,6 +709,275 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile Stacked Card View (clean, readable card layout on screens <= 860px) -->
+        <div
+          class="mobile-comparison-cards"
+          aria-label="Feature comparison cards">
+          <!-- Card 1 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">Incremental Sync</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Yes</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Indexes destination and transfers only new or modified files.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status error">No</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Manual drag-and-drop; copies everything or prompts on each
+                  file.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status warning">Partial</span>
+                </div>
+                <p class="mob-comp-detail">
+                  iTunes creates opaque backup image; iCloud requires internet.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">Conflict Handling</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Non-destructive</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Preserves originals, appends <code>_new</code> (e.g.
+                  <code>IMG_1234_new.HEIC</code>).
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status error">Destructive</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Prompts to overwrite without byte verification.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status warning">Opaque</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Overwrites or hides based on cloud cache.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">Progress Transparency</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Real-Time</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Exact stages, live file count, and streaming throughput
+                  (MB/s).
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status error">None</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Opaque green loading bar with generic estimates.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status warning">Minimal</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Indeterminate spinning wheel without file counts.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">MTP Stability &amp; Recovery</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">High</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Direct chunked <code>.part</code> streaming and safe lockfile
+                  crash recovery.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status error">Poor</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Stalls with "Device unreachable" and leaves corrupt partial
+                  files.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status warning">Rigid</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Single connection timeout fails the entire batch transfer.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">Stuck File Handling</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Instant Skip</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Press <kbd>S</kbd> to bypass unreadable asset without halting
+                  the batch.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status error">Freezes</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Hangs entire Explorer window; requires task kill or
+                  unplugging.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status error">Fails</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Aborts entire backup operation on any single unreadable item.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 6 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">
+                Cloud &amp; Subscription Requirements
+              </h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Zero</span>
+                </div>
+                <p class="mob-comp-detail">
+                  100% offline, local direct USB transfer to your own drives.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status success">Zero</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Offline USB, but hampered by frequent MTP driver stalls.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status error">Paid Plans</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Full camera rolls require recurring monthly 2TB iCloud plans.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 7 -->
+          <div class="mob-comp-card">
+            <div class="mob-comp-header">
+              <h3 class="mob-comp-title">Direct File Access</h3>
+            </div>
+            <div class="mob-comp-rows">
+              <div class="mob-comp-row highlight">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iPhone Backup Sync</span>
+                  <span class="badge-status success">Standard Folders</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Direct access to standard JPG, HEIC, MP4, MOV files on
+                  external storage.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">Windows File Explorer</span>
+                  <span class="badge-status success">Standard Folders</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Standard files, provided the Explorer copy completes without
+                  hanging.
+                </p>
+              </div>
+              <div class="mob-comp-row">
+                <div class="mob-comp-app">
+                  <span class="mob-app-name">iTunes / iCloud</span>
+                  <span class="badge-status error">Proprietary DB</span>
+                </div>
+                <p class="mob-comp-detail">
+                  Hashed manifest database files, completely unreadable in
+                  Explorer.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
