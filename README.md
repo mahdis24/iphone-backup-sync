@@ -257,4 +257,12 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
   <a href="https://vibecodinglist.com/projects/iphone-backup-sync?utm_source=vcl_badge&utm_medium=builder_site&utm_campaign=listed_badge&utm_content=iphone-backup-sync" target="_blank" rel="noopener">
   <img src="https://vibecodinglist.com/assets/embed-widget/featured-on-badge-light.png" alt="Featured on VibeCodingList" width="200" height="51" />
 </a>
+  <a href="https://lift-off.sh/p/iphone-backup-sync" target="_blank" title="LiftOff launch badge">
+  <img
+    src="https://lift-off.sh/images/badges/badgeLaunchedLight.webp"
+    alt="iPhone Backup Sync on LiftOff Badge"
+    width="200"
+    height="auto"
+  />
+</a>
 </p>
