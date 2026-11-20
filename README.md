@@ -265,4 +265,7 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
     height="auto"
   />
 </a>
+  <a href="https://newtool.site/item/iphone-backup-sync?utm_source=github.com" target="_blank" rel="noopener">
+  <img src="https://newtool.site/badges/newtool-light.svg" alt="Featured on NewTool.site" height = "54px" width = "auto" />
+</a>
 </p>
