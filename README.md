@@ -16,11 +16,6 @@
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
 </p>
 
-<p>
-  <a href="https://www.producthunt.com/products/iphone-backup-sync?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-iphone-backup-sync" target="_blank" rel="noopener noreferrer"><img alt="iphone-backup-sync - Fast, incremental iPhone DCIM backup for Windows via USB | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1316271&amp;theme=light&amp;t=1795116065635" /></a>
-  <a href="https://trendshift.io/repositories/355344?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-355344" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/355344/daily?language=Vue" alt="mahdis24%2Fiphone-backup-sync | Trendshift" width="250" height="55" /></a>
-</p>
-
 ### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
 
 </div>
@@ -246,32 +241,3 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
 - **Security:** Review [SECURITY.md](SECURITY.md) for vulnerability disclosure procedures.
 - **Changelog:** Review [CHANGELOG.md](CHANGELOG.md) for version release history.
 - **Author:** Created by [Mahdi Salek](https://mahdis24.tech) ([@mahdis24](https://github.com/mahdis24)).
-
----
-
-<p>
- <a href="https://uno.directory" target="_blank" rel="noopener">
-  <img src="https://uno.directory/uno-directory.svg" alt="Listed on Uno Directory" width="180" height="auto" />
-</a>
- <a href="https://aitop10.tools/" target="_blank">AiTop10 Tools</a>
-  <a href="https://vibecodinglist.com/projects/iphone-backup-sync?utm_source=vcl_badge&utm_medium=builder_site&utm_campaign=listed_badge&utm_content=iphone-backup-sync" target="_blank" rel="noopener">
-  <img src="https://vibecodinglist.com/assets/embed-widget/featured-on-badge-light.png" alt="Featured on VibeCodingList" width="200" height="51" />
-</a>
-  <a href="https://lift-off.sh/p/iphone-backup-sync" target="_blank" title="LiftOff launch badge">
-  <img
-    src="https://lift-off.sh/images/badges/badgeLaunchedLight.webp"
-    alt="iPhone Backup Sync on LiftOff Badge"
-    width="200"
-    height="auto"
-  />
-</a>
-  <a href="https://newtool.site/item/iphone-backup-sync?utm_source=github.com" target="_blank" rel="noopener">
-  <img src="https://newtool.site/badges/newtool-light.svg" alt="Featured on NewTool.site" height = "54px" width = "auto" />
-</a>
-  <a href="https://shiplaun.ch/projects/iphone-backup-sync?utm_source=badge" target="_blank" rel="noopener noreferrer">
-  <img src="https://shiplaun.ch/shiplaunch/images/badges/featured-on-light.svg" alt="Featured on Ship Launch" style="height:44px;width:auto"/>
-</a>
-  <a href="https://www.scrolllaunch.com/products/iphone-backup-sync?ref=badge" target="_blank" rel="noopener">
-  <img src="https://www.scrolllaunch.com/api/badge/iphone-backup-sync" alt="Featured on ScrollLaunch" width="220" height="48" loading="lazy" />
-</a>
-</p>
