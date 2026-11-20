@@ -271,4 +271,7 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
   <a href="https://shiplaun.ch/projects/iphone-backup-sync?utm_source=badge" target="_blank" rel="noopener noreferrer">
   <img src="https://shiplaun.ch/shiplaunch/images/badges/featured-on-light.svg" alt="Featured on Ship Launch" style="height:44px;width:auto"/>
 </a>
+  <a href="https://www.scrolllaunch.com/products/iphone-backup-sync?ref=badge" target="_blank" rel="noopener">
+  <img src="https://www.scrolllaunch.com/api/badge/iphone-backup-sync" alt="Featured on ScrollLaunch" width="220" height="48" loading="lazy" />
+</a>
 </p>
