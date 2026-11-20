@@ -10,7 +10,7 @@
     "type": "git",
     "url": "https://github.com/mahdis24/iphone-backup-sync.git"
   },
-  "homepage": "https://github.com/mahdis24/iphone-backup-sync#readme",
+  "homepage": "https://mahdis24.tech/iphone-backup-sync/",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

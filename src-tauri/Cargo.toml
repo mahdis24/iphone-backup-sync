@@ -5,7 +5,7 @@ description = "High-reliability Windows MTP/WPD photo & video backup tool for iO
 authors = ["Mahdi Salek <https://mahdis24.tech>"]
 license = "MIT"
 repository = "https://github.com/mahdis24/iphone-backup-sync"
-homepage = "https://mahdis24.tech"
+homepage = "https://mahdis24.tech/iphone-backup-sync/"
 readme = "../README.md"
 edition = "2024"
 
