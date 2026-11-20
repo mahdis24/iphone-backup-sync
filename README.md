@@ -254,4 +254,7 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
   <img src="https://uno.directory/uno-directory.svg" alt="Listed on Uno Directory" width="180" height="auto" />
 </a>
  <a href="https://aitop10.tools/" target="_blank">AiTop10 Tools</a>
+  <a href="https://vibecodinglist.com/projects/iphone-backup-sync?utm_source=vcl_badge&utm_medium=builder_site&utm_campaign=listed_badge&utm_content=iphone-backup-sync" target="_blank" rel="noopener">
+  <img src="https://vibecodinglist.com/assets/embed-widget/featured-on-badge-dark.png" alt="Featured on VibeCodingList" width="200" height="51" />
+</a>
 </p>
