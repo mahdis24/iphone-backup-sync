@@ -22,7 +22,9 @@
   <a href="https://uno.directory" target="_blank" rel="noopener">
   <img src="https://uno.directory/uno-directory.svg" alt="Listed on Uno Directory" width="120" height="30" />
 </a>
-  <a href="https://firstlook.tools" target="_blank"><img src="https://firstlook.tools/badge/badge_light.svg" alt="Featured on First Look" width="200" height="54" /></a>
+ <a href="https://smolhunt.com/projects/iphone-backup-sync?utm_source=badge" target="_blank" rel="noopener noreferrer">
+  <img src="https://smolhunt.com/smolhunt/images/badges/featured-on-light.svg" alt="Featured on Smol Hunt" style="height:44px;width:auto"/>
+</a>
 </p>
 
 ### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
