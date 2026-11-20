@@ -268,4 +268,7 @@ Contributions and issue reports are welcome. Please consult [CONTRIBUTING.md](CO
   <a href="https://newtool.site/item/iphone-backup-sync?utm_source=github.com" target="_blank" rel="noopener">
   <img src="https://newtool.site/badges/newtool-light.svg" alt="Featured on NewTool.site" height = "54px" width = "auto" />
 </a>
+  <a href="https://shiplaun.ch/projects/iphone-backup-sync?utm_source=badge" target="_blank" rel="noopener noreferrer">
+  <img src="https://shiplaun.ch/shiplaunch/images/badges/featured-on-light.svg" alt="Featured on Ship Launch" style="height:44px;width:auto"/>
+</a>
 </p>
