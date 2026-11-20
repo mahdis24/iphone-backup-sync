@@ -22,6 +22,7 @@
   <a href="https://uno.directory" target="_blank" rel="noopener">
   <img src="https://uno.directory/uno-directory.svg" alt="Listed on Uno Directory" width="120" height="30" />
 </a>
+  <a href="https://firstlook.tools" target="_blank"><img src="https://firstlook.tools/badge/badge_light.svg" alt="Featured on First Look" width="200" height="54" /></a>
 </p>
 
 ### [⬇️ Download Latest Release (.exe)](https://github.com/mahdis24/iphone-backup-sync/releases/latest)
