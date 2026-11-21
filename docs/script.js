@@ -18,6 +18,10 @@
   const themeToggleBtn = document.getElementById('theme-toggle')
   const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
+  const productHuntBadges = document.querySelectorAll(
+    '[badge-id="product_hunt"]'
+  )
+
   function getSystemPreference() {
     return darkMediaQuery.matches ? 'dark' : 'light'
   }
@@ -73,6 +77,18 @@
       setStoredTheme(target)
       applyTheme(target)
     }
+
+    toggleThemeBadges(target)
+  }
+
+  function toggleThemeBadges(theme) {
+    productHuntBadges.forEach((b) => {
+      let tempSrc = new URL(b.src)
+
+      tempSrc.searchParams.set('theme', theme === 'dark' ? 'neutral' : 'light')
+
+      b.src = tempSrc.toString()
+    })
   }
 
   if (themeToggleBtn) {
@@ -140,15 +156,15 @@
       }
 
       if (windowsAsset && windowsAsset.browser_download_url) {
-        const downloadUrl = windowsAsset.browser_download_url;
-        if (primaryDownloadBtn) primaryDownloadBtn.href = downloadUrl;
-        if (footerDownloadBtn) footerDownloadBtn.href = downloadUrl;
-        const mobileDlBtn = document.querySelector('.mobile-download-btn');
-        if (mobileDlBtn) mobileDlBtn.href = downloadUrl;
+        const downloadUrl = windowsAsset.browser_download_url
+        if (primaryDownloadBtn) primaryDownloadBtn.href = downloadUrl
+        if (footerDownloadBtn) footerDownloadBtn.href = downloadUrl
+        const mobileDlBtn = document.querySelector('.mobile-download-btn')
+        if (mobileDlBtn) mobileDlBtn.href = downloadUrl
       }
 
-      if (releaseMetaText) releaseMetaText.textContent = metaLabel;
-      if (footerReleaseMeta) footerReleaseMeta.textContent = metaLabel;
+      if (releaseMetaText) releaseMetaText.textContent = metaLabel
+      if (footerReleaseMeta) footerReleaseMeta.textContent = metaLabel
     } catch {
       // Gracefully silent fallback to default GitHub releases link
     }
@@ -159,27 +175,27 @@
   // ---------------------------------------------------------------------------
   function formatStarCount(stars) {
     if (stars >= 1000) {
-      return `★ ${(stars / 1000).toFixed(1)}k`;
+      return `★ ${(stars / 1000).toFixed(1)}k`
     }
-    return `★ ${stars}`;
+    return `★ ${stars}`
   }
 
   async function fetchRepoStars() {
-    const starBadges = document.querySelectorAll('.github-stars');
-    if (starBadges.length === 0) return;
+    const starBadges = document.querySelectorAll('.github-stars')
+    if (starBadges.length === 0) return
     try {
       const response = await fetch(REPO_API_URL, {
-        headers: { Accept: 'application/vnd.github.v3+json' },
-      });
+        headers: { Accept: 'application/vnd.github.v3+json' }
+      })
 
-      if (!response.ok) return;
+      if (!response.ok) return
 
-      const data = await response.json();
+      const data = await response.json()
       if (typeof data.stargazers_count === 'number') {
-        const formatted = formatStarCount(data.stargazers_count);
+        const formatted = formatStarCount(data.stargazers_count)
         starBadges.forEach((badge) => {
-          badge.textContent = formatted;
-        });
+          badge.textContent = formatted
+        })
       }
     } catch {
       // Keep static text if request fails or rate-limited
@@ -308,28 +324,28 @@
         !siteNav.contains(event.target) &&
         !mobileToggleBtn.contains(event.target)
       ) {
-        siteNav.classList.remove('is-open');
-        mobileToggleBtn.setAttribute('aria-expanded', 'false');
+        siteNav.classList.remove('is-open')
+        mobileToggleBtn.setAttribute('aria-expanded', 'false')
       }
-    });
+    })
 
     // Close when pressing Escape key
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && siteNav.classList.contains('is-open')) {
-        siteNav.classList.remove('is-open');
-        mobileToggleBtn.setAttribute('aria-expanded', 'false');
-        mobileToggleBtn.focus();
+        siteNav.classList.remove('is-open')
+        mobileToggleBtn.setAttribute('aria-expanded', 'false')
+        mobileToggleBtn.focus()
       }
-    });
+    })
 
     // Close mobile nav automatically on viewport expansion to desktop
-    const desktopMedia = window.matchMedia('(min-width: 861px)');
+    const desktopMedia = window.matchMedia('(min-width: 861px)')
     desktopMedia.addEventListener('change', (e) => {
       if (e.matches && siteNav.classList.contains('is-open')) {
-        siteNav.classList.remove('is-open');
-        mobileToggleBtn.setAttribute('aria-expanded', 'false');
+        siteNav.classList.remove('is-open')
+        mobileToggleBtn.setAttribute('aria-expanded', 'false')
       }
-    });
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -337,4 +353,5 @@
   // ---------------------------------------------------------------------------
   fetchLatestRelease()
   fetchRepoStars()
+  toggleThemeBadges(getCurrentlyRenderedScheme())
 })()
