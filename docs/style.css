@@ -52,8 +52,8 @@
   --text-primary-dark: #f8fafc;
   --text-secondary-dark: #cbd5e1;
   --text-muted-dark: #94a3b8;
-  --accent-dark: #38bdf8;
-  --accent-hover-dark: #7dd3fc;
+  --accent-dark: #14b8ff;
+  --accent-hover-dark: #51c8ff;
   --accent-bg-dark: rgba(56, 189, 248, 0.12);
   --success-dark: #4ade80;
   --success-bg-dark: rgba(74, 222, 128, 0.12);
@@ -645,6 +645,7 @@ code {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 0.85rem;
   margin-bottom: 1.35rem;
   width: 100%;
@@ -667,7 +668,7 @@ code {
 .btn-lg {
   padding: 0.8rem 1.4rem;
   font-size: 0.98rem;
-  min-height: 2.85rem;
+  min-height: 3.5rem;
 }
 
 .btn-xl {
@@ -1472,6 +1473,7 @@ code {
   Download CTA Section
 -------------------------------------------------------------------------- */
 .download-section {
+  border-bottom: 1px solid var(--border);
   padding: clamp(2.5rem, 5vw, 4.5rem) 0;
 }
 
@@ -1740,6 +1742,22 @@ code {
   .footer-container {
     grid-template-columns: 1fr;
     gap: 2rem;
+  }
+}
+
+#badges {
+  padding: clamp(2.5rem, 5vw, 4.5rem) 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@keyframes home-marquee-left {
+  0% {
+    transform: translate(0%);
+  }
+  to {
+    transform: translate(-50%);
   }
 }
 
