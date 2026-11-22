@@ -1,2 +1,0 @@
-[env]
-PATH = { value = "C:\\Users\\mahdi\\.rustup\\toolchains\\stable-x86_64-pc-windows-gnu\\lib\\rustlib\\x86_64-pc-windows-gnu\\bin\\self-contained;C:\\Users\\mahdi\\.cargo\\bin;${PATH}", relative = false }

@@ -17,6 +17,8 @@ target/
 src-tauri/target/
 src-tauri/gen/schemas/
 **/*.rs.bk
+.cargo/config.toml
+src-tauri/.cargo/config.toml
 
 # App Runtime & State Files
 skip_list.json
