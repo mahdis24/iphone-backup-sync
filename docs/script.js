@@ -349,6 +349,67 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 6. Interactive Demo Video Playback
+  // ---------------------------------------------------------------------------
+  const videoWrapper = document.querySelector('.preview-video-wrapper')
+  const demoVideo = document.getElementById('demo-video')
+  const playBtn = document.getElementById('video-play-btn')
+
+  if (demoVideo && playBtn && videoWrapper) {
+    let lastToggleTime = 0
+
+    function togglePlayback(e) {
+      if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault()
+      }
+
+      const now = Date.now()
+      if (now - lastToggleTime < 300) {
+        return
+      }
+      lastToggleTime = now
+
+      if (demoVideo.paused) {
+        demoVideo.play().catch(() => {})
+      } else {
+        demoVideo.pause()
+      }
+    }
+
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      togglePlayback(e)
+    })
+
+    demoVideo.addEventListener('click', (e) => {
+      // Allow interacting with native control bar at the bottom
+      if (demoVideo.hasAttribute('controls')) {
+        const rect = demoVideo.getBoundingClientRect()
+        const clickY = e.clientY - rect.top
+        if (clickY > rect.height - 56) {
+          return
+        }
+      }
+      togglePlayback(e)
+    })
+
+    demoVideo.addEventListener('play', () => {
+      videoWrapper.classList.add('is-playing')
+      playBtn.setAttribute('aria-label', 'Pause demo video')
+    })
+
+    demoVideo.addEventListener('pause', () => {
+      videoWrapper.classList.remove('is-playing')
+      playBtn.setAttribute('aria-label', 'Play demo video')
+    })
+
+    demoVideo.addEventListener('ended', () => {
+      videoWrapper.classList.remove('is-playing')
+      playBtn.setAttribute('aria-label', 'Play demo video')
+    })
+  }
+
+  // ---------------------------------------------------------------------------
   // Initialize Background Data
   // ---------------------------------------------------------------------------
   fetchLatestRelease()
