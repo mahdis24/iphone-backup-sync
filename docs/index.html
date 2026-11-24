@@ -432,74 +432,33 @@
           </span>
         </div>
 
-        <!-- App Preview Window Mockup (Windows 11 Style) -->
-        <div class="preview-frame-wrap">
-          <div class="win-window">
-            <div class="win-titlebar">
-              <div class="win-titlebar-left">
-                <img
-                  src="assets/favicon.png"
-                  alt=""
-                  width="16"
-                  height="16"
-                  class="win-app-icon"
-                  aria-hidden="true" />
-                <span class="win-title-text">iPhone Backup Sync</span>
-              </div>
-              <div class="win-caption-controls" aria-hidden="true">
-                <div class="win-control win-minimize" title="Minimize">
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <line
-                      x1="0"
-                      y1="5"
-                      x2="10"
-                      y2="5"
-                      stroke="currentColor"
-                      stroke-width="1"></line>
-                  </svg>
-                </div>
-                <div class="win-control win-maximize" title="Maximize">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <rect
-                      x="0.5"
-                      y="0.5"
-                      width="9"
-                      height="9"
-                      stroke="currentColor"
-                      stroke-width="1"></rect>
-                  </svg>
-                </div>
-                <div class="win-control win-close" title="Close">
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <line
-                      x1="0.5"
-                      y1="0.5"
-                      x2="9.5"
-                      y2="9.5"
-                      stroke="currentColor"
-                      stroke-width="1.1"></line>
-                    <line
-                      x1="9.5"
-                      y1="0.5"
-                      x2="0.5"
-                      y2="9.5"
-                      stroke="currentColor"
-                      stroke-width="1.1"></line>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div class="win-window-body">
-              <img
-                src="screenshots/preview.png"
-                alt="iPhone Backup Sync application screenshot showing scan progress, metrics, and file table"
-                width="1280"
-                height="800"
-                loading="eager"
-                fetchpriority="high"
-                class="preview-image" />
-            </div>
-          </div>
+        <!-- App Preview / Demo -->
+        <div class="preview-video-wrapper">
+          <video
+            id="demo-video"
+            src="demos/IBS_Demo.mp4"
+            poster="screenshots/preview.png"
+            class="preview-video"
+            width="1920"
+            height="1080"
+            muted
+            controls
+            playsinline
+            preload="none"
+            aria-label="iPhone Backup Sync application demonstration video">
+            Your browser does not support the video tag.
+          </video>
+          <button
+            type="button"
+            class="video-play-btn"
+            id="video-play-btn"
+            aria-label="Play demo video">
+            <span class="video-play-icon" aria-hidden="true">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+              </svg>
+            </span>
+          </button>
         </div>
       </div>
     </section>
