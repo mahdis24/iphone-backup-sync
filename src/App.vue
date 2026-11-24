@@ -1111,8 +1111,13 @@ onUnmounted(() => {
               <rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect>
               <line x1="12" y1="18" x2="12" y2="18.01"></line>
             </svg>
-            <h3>No Scanned Files Yet</h3>
-            <p>Ensure your iPhone is connected via USB and click <strong>Scan iPhone</strong> above to inspect and classify media.</p>
+            <h3>{{ selectedDevice ? 'Ready to Scan' : 'No Device Detected' }}</h3>
+            <p v-if="selectedDevice">
+              Click <strong>Scan iPhone</strong> above to inspect and classify media.
+            </p>
+            <p v-else>
+              Connect your iPhone via USB and unlock it. If not detected, ensure Apple Mobile Device Support is installed (via iTunes or the Apple Devices app).
+            </p>
           </div>
 
           <div v-else-if="filteredFiles.length === 0" class="empty-state">
