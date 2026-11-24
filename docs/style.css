@@ -114,8 +114,6 @@
   --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-card:
     0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-window:
-    0 14px 34px -4px rgba(0, 0, 0, 0.16), 0 4px 14px -2px rgba(0, 0, 0, 0.1);
 
   /* Touch & Scroll Tokens */
   --target-size: 28px;
@@ -766,134 +764,84 @@ code {
 }
 
 /* --------------------------------------------------------------------------
-  Windows Style App Preview Window Mockup
+  App Demo Video & Play Button Overlay
 -------------------------------------------------------------------------- */
-.preview-frame-wrap {
+.preview-video-wrapper {
+  position: relative;
+  display: block;
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-}
-
-.win-window {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-strong);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: var(--shadow-window);
-  text-align: left;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  cursor: pointer;
 }
 
-.win-titlebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 30px;
-  min-height: 30px;
-  padding-left: 0.75rem;
-  padding-right: 0;
-  background-color: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-}
-
-.win-titlebar-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  overflow: hidden;
-  padding-right: 0.5rem;
-}
-
-.win-app-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.win-title-text {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.win-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-full);
-  background-color: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.status-indicator-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--success);
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* Windows Caption Controls */
-.win-caption-controls {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.win-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 100%;
-  color: var(--text-secondary);
-  cursor: default;
-  transition:
-    background-color 0.1s ease,
-    color 0.1s ease;
-}
-
-.win-control:hover {
-  background-color: var(--border);
-  color: var(--text-primary);
-}
-
-.win-control.win-close:hover {
-  background-color: #e81123;
-  color: #ffffff;
-}
-
-.win-control.win-close:active {
-  background-color: #c4101e;
-  color: #ffffff;
-}
-
-.win-window-body {
-  background-color: #0b0f17;
-  overflow: hidden;
-}
-
-.preview-image {
+.preview-video {
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* Play Button Overlay */
+.video-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.25s ease,
+    visibility 0.25s ease,
+    box-shadow 0.2s ease;
+  z-index: 2;
+}
+
+.video-play-btn:hover {
+  background-color: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow: 0 12px 36px rgba(2, 132, 199, 0.45), 0 0 0 2px var(--accent);
+}
+
+.video-play-btn:active {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.video-play-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.video-play-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 3px;
+}
+
+/* Hide play button when video is playing */
+.preview-video-wrapper.is-playing .video-play-btn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.8);
 }
 
 /* --------------------------------------------------------------------------
@@ -1794,14 +1742,6 @@ code {
     flex-direction: column;
     gap: 0.85rem;
   }
-
-  .win-status-badge {
-    display: none;
-  }
-
-  .win-control {
-    width: 36px;
-  }
 }
 
 /* Small Phones (<= 540px) */
@@ -1848,10 +1788,6 @@ code {
   .mobile-menu-btn {
     width: 2.15rem;
     height: 2.15rem;
-  }
-
-  .win-control {
-    width: 30px;
   }
 
   .code-title {
