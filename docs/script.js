@@ -18,10 +18,6 @@
   const themeToggleBtn = document.getElementById('theme-toggle')
   const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
-  const productHuntBadges = document.querySelectorAll(
-    '[badge-id="product_hunt"]'
-  )
-
   function getSystemPreference() {
     return darkMediaQuery.matches ? 'dark' : 'light'
   }
@@ -77,18 +73,6 @@
       setStoredTheme(target)
       applyTheme(target)
     }
-
-    toggleThemeBadges(target)
-  }
-
-  function toggleThemeBadges(theme) {
-    productHuntBadges.forEach((b) => {
-      let tempSrc = new URL(b.src)
-
-      tempSrc.searchParams.set('theme', theme === 'dark' ? 'neutral' : 'light')
-
-      b.src = tempSrc.toString()
-    })
   }
 
   if (themeToggleBtn) {
@@ -414,5 +398,4 @@
   // ---------------------------------------------------------------------------
   fetchLatestRelease()
   fetchRepoStars()
-  toggleThemeBadges(getCurrentlyRenderedScheme())
 })()
