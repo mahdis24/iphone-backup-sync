@@ -52,7 +52,7 @@
 
 ## Installation & Windows SmartScreen
 
-Download the latest `.exe` installer or standalone executable from the [GitHub Releases](https://github.com/mahdis24/iphone-backup-sync/releases/latest) page.
+Download the latest `.exe` installer from the [GitHub Releases](https://github.com/mahdis24/iphone-backup-sync/releases/latest) page.
 
 ### Handling the "Unknown Publisher" Notice
 
