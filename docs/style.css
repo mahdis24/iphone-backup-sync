@@ -1172,48 +1172,6 @@ code {
 }
 
 /* --------------------------------------------------------------------------
-  Callout Section
--------------------------------------------------------------------------- */
-.callout-section {
-  padding: clamp(1.75rem, 3.5vw, 2.75rem) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.callout-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.25rem;
-  background-color: var(--accent-bg);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
-  padding: clamp(1.15rem, 2.5vw, 1.85rem);
-}
-
-.callout-icon-col {
-  color: var(--accent);
-  flex-shrink: 0;
-  padding-top: 0.2rem;
-}
-
-.callout-title {
-  font-size: 1.12rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.45rem;
-}
-
-.callout-text {
-  font-size: 0.94rem;
-  color: var(--text-primary);
-  margin-bottom: 0.35rem;
-}
-
-.callout-subtext {
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-}
-
-/* --------------------------------------------------------------------------
   Requirements & Open Source Info
 -------------------------------------------------------------------------- */
 .requirements-section {
@@ -1736,11 +1694,6 @@ code {
   .steps-grid,
   .info-grid {
     grid-template-columns: 1fr;
-  }
-
-  .callout-card {
-    flex-direction: column;
-    gap: 0.85rem;
   }
 }
 
