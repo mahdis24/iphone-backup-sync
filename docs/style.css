@@ -801,7 +801,9 @@ code {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   transition:
     transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     background-color 0.2s ease,
@@ -817,7 +819,9 @@ code {
   color: #ffffff;
   border-color: var(--accent);
   transform: translate(-50%, -50%) scale(1.08);
-  box-shadow: 0 12px 36px rgba(2, 132, 199, 0.45), 0 0 0 2px var(--accent);
+  box-shadow:
+    0 12px 36px rgba(2, 132, 199, 0.45),
+    0 0 0 2px var(--accent);
 }
 
 .video-play-btn:active {
@@ -1652,12 +1656,90 @@ code {
 }
 
 #badges {
-  padding: clamp(2.5rem, 5vw, 4.5rem) 0;
+  padding: clamp(2.5rem, 5vw, 4rem) 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.badges-featured {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 18px;
+  gap: 1.25rem;
+}
+
+.badges-collapse {
+  width: 100%;
+  text-align: center;
+}
+
+.badges-collapse-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.badges-collapse-summary::-webkit-details-marker {
+  display: none;
+}
+
+.badges-collapse-summary:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background-color: var(--bg-card-hover);
+}
+
+.badges-collapse-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.badges-collapse-chevron {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.badges-collapse[open] .badges-collapse-chevron {
+  transform: rotate(180deg);
+}
+
+.badges-collapse-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding-top: 1.5rem;
+  animation: badgesFadeIn 0.25s ease-out;
+}
+
+@keyframes badgesFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes home-marquee-left {
