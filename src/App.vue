@@ -952,7 +952,7 @@ onUnmounted(() => {
           </div>
           <div class="metric-content">
             <div class="metric-val text-cyan">{{ summary.verified_ignored_count }}</div>
-            <div class="metric-lbl">Verified _new Ignored</div>
+            <div class="metric-lbl">Already Backed Up</div>
           </div>
         </div>
 
