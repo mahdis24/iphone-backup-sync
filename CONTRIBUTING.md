@@ -16,7 +16,7 @@ All contributors and participants are expected to adhere to our [Code of Conduct
 Before filing an issue, check existing GitHub Issues to see if the problem has already been reported. When reporting a bug, please include:
 - Windows version and build (e.g. Windows 11 23H2).
 - iOS device model and iOS version (e.g. iPhone 15 Pro, iOS 18.1).
-- Transfer settings (e.g. "Keep Originals" status in Settings > Photos).
+- Transfer settings (e.g. "Keep Originals" status in Settings > Photos, and whether iCloud Photos is set to "Download and Keep Originals" or "Optimize iPhone Storage").
 - Steps to reproduce the issue.
 - Relevant error logs or UI messages.
 
@@ -46,6 +46,9 @@ Open an issue using the Feature Request template detailing:
 
    # Rust strict clippy checks
    cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+   # Rust unit tests
+   cargo test --manifest-path src-tauri/Cargo.toml
    ```
 5. **Open a PR**: Submit a pull request targeting the `main` branch and fill out the pull request template.
 

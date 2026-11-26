@@ -14,7 +14,8 @@ A clear and concise description of what the bug is.
 - **iOS Device Model**: (e.g. iPhone 15 Pro)
 - **iOS Version**: (e.g. iOS 18.1)
 - **Photos Transfer Setting**: Keep Originals / Automatic
-- **Application Version**: (e.g. v0.1.0)
+- **iCloud Photos Setting**: Download and Keep Originals / Optimize iPhone Storage / Disabled
+- **Application Version**: (e.g. v0.4.3)
 
 **Steps to Reproduce:**
 1. Connect iPhone via USB and tap 'Trust'.

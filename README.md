@@ -75,15 +75,16 @@ To run the application:
 
 ---
 
-## Recommended iPhone Setting
+## Recommended iPhone Settings & Troubleshooting
 
-To avoid mid-transfer iOS transcoding crashes over USB, configure your device:
+To avoid mid-transfer iOS transcoding crashes and MTP stream errors (`0x8007065D`) over USB, configure your device:
 
 1. Open **Settings** on your iPhone.
 2. Navigate to **Photos**.
 3. Scroll to the bottom under **Transfer to Mac or PC** and select **Keep Originals**.
+4. If you use **iCloud Photos**, select **Download and Keep Originals** instead of **Optimize iPhone Storage** so full-resolution files are stored locally on the device (cloud-only placeholders cannot be streamed over USB MTP and can trigger `0x8007065D` errors).
 
-Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or ProRes/H.264 transcoding, which is the primary cause of MTP stream timeouts and device resets.
+Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or ProRes/H.264 transcoding, which is a primary cause of MTP stream timeouts and device resets. For large libraries, prefer a direct motherboard USB port rather than an unpowered hub.
 
 ---
 
@@ -94,8 +95,8 @@ Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or 
 - **Multi-Stage Real-Time Scan Progress:** Transparent progress visualization displaying exact stages (`connecting`, `enumerating`, `indexing`, `classifying`), live file counters, and percentage completion.
 - **Scan & Sync Cancellation:** Instant, safe cancellation for active scans and ongoing batch transfers with automatic purging of temporary `.part` artifacts without blacklisting cancelled items.
 - **Custom Context Menu & Granular Actions:** Right-click any table row to immediately sync that specific file or toggle its inclusion in the persistent skip list.
-- **Interactive Metric Filters:** Summary cards (Total on iPhone, Total in Backup, NEW Files, Size Mismatch, Verified Ignored, Blacklisted) act as live filters for the table, with a dedicated "Failed" filter for unreadable items.
-- **Resilient Sync Error Recovery:** Files encountering MTP read faults (such as `0x8007001E`) are tagged with `ERROR` status, preserving full details without stalling the queue or freezing the UI.
+- **Interactive Metric Filters:** Summary cards (Total on iPhone, Total in Backup with live completion updates, NEW Files, Size Mismatch, Already Backed Up, Blacklisted) act as live filters for the table, with a dedicated "Failed" filter for unreadable items.
+- **Resilient Sync Error Recovery:** Files encountering MTP read or stream faults (such as `0x8007001E` or `0x8007065D`) are checked via `GetSupportedResources` and tagged with `ERROR` status with diagnostic details without stalling the queue or freezing the UI.
 - **Recursive DCIM Scanning:** Recursively traverses the iPhone storage root, automatically discovering all media subdirectories (`DCIM/*APPLE`).
 - **Byte-Exact Diffing & Classification:** Scans destination folders via indexed hash maps, classifying assets into:
   - `NEW`: Asset does not exist in target backup directory.
@@ -106,7 +107,7 @@ Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or 
 - **Non-Destructive Conflict Resolution:** Size-mismatched files are saved with a `_new` suffix (e.g., `IMG_1234_new.HEIC`). If an identical-sized `_new` file already exists, it is marked as backed up and skipped automatically.
 - **Resilient Chunked Streaming:** Media streams in 64 KB - 256 KB buffers directly into temporary `.part` files, validating exact byte counts and atomically renaming to final destination only after complete transfer.
 - **Crash Recovery & Lockfile Tracking:** Employs a `current_copying.tmp` lockfile. If an MTP disconnection or system shutdown occurs mid-copy, incomplete `.part` fragments are automatically cleaned up on next startup without blacklisting the interrupted asset.
-- **Dynamic Path Resolution & Session Resilience:** Automatically resolves WPD object IDs using hierarchical path lookup and reconnects if an MTP connection resets (such as error `0x8007001F`).
+- **Dynamic Path Resolution & Session Resilience:** Opens read-only WPD sessions (`GENERIC_READ`), resolves WPD object IDs across top-level storage containers via hierarchical path lookup, and closes and reopens sessions with bounded backoff if MTP faults occur (`0x8007001F`, `0x80070015`, `0x8007065D`).
 - **Locale-Agnostic Storage Traversal:** Detects device media containers regardless of Windows display language (German, Spanish, French, etc.) without relying on hardcoded English folder labels.
 - **Case-Insensitive Windows Path Diffing:** Ensures assets with differing file extension or folder casing (such as `.heic` vs `.HEIC` or `100apple` vs `100APPLE`) correctly match existing backups rather than creating duplicate downloads.
 - **Instant Skip Shortcut (<kbd>S</kbd>):** Press <kbd>S</kbd> or click **Skip Current** to immediately drop an in-flight file, delete its partial fragment, add it to `skip_list.json`, and proceed with remaining queue.
@@ -190,6 +191,9 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
 # Rust Clippy linter
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+# Rust unit tests
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 ### 5. Build Standalone Installer & Binary
