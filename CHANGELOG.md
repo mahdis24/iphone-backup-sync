@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-11-26
+
+### Fixed
+
+- **WPD Stream Resource Validation & `0x8007065D` Recovery ([#2](https://github.com/mahdis24/iphone-backup-sync/issues/2))**: Added `GetSupportedResources` inspection with safe `WPD_RESOURCE_GENERIC` fallback (when `WPD_RESOURCE_DEFAULT` is absent) and `WPD_RESOURCE_ATTRIBUTE_CAN_READ` diagnostics when `GetStream` fails.
+- **Clean WPD Session Reopening & Backoff**: Updated `execute_sync` to recover from `0x8007065D` (`ERROR_DATATYPE_MISMATCH`), `0x8007001E`, `0x800700AA`, `0x80070490`, stream read errors, and incomplete transfers by dropping the old `WpdDeviceGuard` before waiting and opening a fresh session, with bounded reopen backoff across consecutive failures so large queues do not stall.
+- **Read-Only WPD Access & COM Lifecycle**: Configured `WPD_CLIENT_DESIRED_ACCESS` to `GENERIC_READ`, updated `ComGuard` to only call `CoUninitialize` when `CoInitializeEx` succeeded, and updated `find_object_id_by_path` to search across all top-level `"DEVICE"` containers using targeted property keys.
+- **Live "Total in Backup" Counter & `O(1)` Row Lookups**: Incremented `summary.total_backup_files` in real time as synced files complete, and indexed `scannedFiles` by `relative_path` for fast progress event updates on large libraries.
+
+### Added
+
+- **Sync Engine Unit Tests**: Added unit tests in `src-tauri/src/sync.rs` covering WPD error classification, session reopen backoff scheduling, path normalization, and file diff classification.
+
 ## [0.4.3] - 2026-11-24
 
 ### Changed
