@@ -374,6 +374,87 @@ impl Default for SyncController {
     }
 }
 
+const SESSION_REOPEN_DELAY_MS: u64 = 250;
+const MAX_EAGER_SESSION_REOPENS: usize = 3;
+const PERIODIC_REOPEN_INTERVAL: usize = 25;
+
+/// Returns `true` when a WPD/MTP error may stem from a stale object ID,
+/// wedged MTP session, or transient device communication fault.
+pub fn is_recoverable_wpd_error(err: &str) -> bool {
+    let lower = err.to_ascii_lowercase();
+    lower.contains("0x8007065d")
+        || lower.contains("0x8007001f")
+        || lower.contains("0x80070015")
+        || lower.contains("0x8007001e")
+        || lower.contains("0x800700aa")
+        || lower.contains("0x80070490")
+        || lower.contains("failed to get device content")
+        || lower.contains("failed to get iportabledeviceresources")
+        || lower.contains("stream read error")
+        || lower.contains("incomplete transfer")
+        || lower.contains("device session is unavailable")
+}
+
+/// Limits full session reopens when many consecutive files fail identically,
+/// recovering immediately for transient glitches without stalling huge queues.
+pub fn should_reopen_session(consecutive_errors: usize) -> bool {
+    consecutive_errors > 0
+        && (consecutive_errors <= MAX_EAGER_SESSION_REOPENS
+            || consecutive_errors.is_multiple_of(PERIODIC_REOPEN_INTERVAL))
+}
+
+fn interruptible_sleep(duration_ms: u64, controller: &SyncController) {
+    let step_ms = 50;
+    let mut elapsed = 0;
+    while elapsed < duration_ms {
+        if controller.abort_or_skip_flag.load(Ordering::Relaxed)
+            || controller.cancel_sync_flag.load(Ordering::Relaxed)
+        {
+            break;
+        }
+        let chunk = std::cmp::min(step_ms, duration_ms - elapsed);
+        std::thread::sleep(std::time::Duration::from_millis(chunk));
+        elapsed += chunk;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stream_with_progress<F>(
+    device: &crate::wpd::WpdDeviceGuard,
+    object_id: &str,
+    dest_path: &Path,
+    file_item: &ScannedFile,
+    index: usize,
+    total_files: usize,
+    abort_flag: &AtomicBool,
+    on_progress: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(SyncProgressPayload),
+{
+    stream_file_to_disk(
+        device,
+        object_id,
+        dest_path,
+        file_item.size,
+        abort_flag,
+        |copied, total, speed| {
+            on_progress(SyncProgressPayload {
+                current_file_index: index + 1,
+                total_files,
+                filename: file_item.filename.clone(),
+                relative_path: file_item.relative_path.clone(),
+                bytes_copied: copied,
+                total_bytes: total,
+                status: "copying".to_string(),
+                speed_bytes_sec: speed,
+                error: None,
+            });
+            Ok(())
+        },
+    )
+}
+
 pub fn execute_sync<F>(
     device_pnp_id: &str,
     backup_dir: &Path,
@@ -386,11 +467,13 @@ where
     F: FnMut(SyncProgressPayload),
 {
     // Connect to device
-    let mut device = crate::wpd::open_device(device_pnp_id)?;
+    let mut device: Option<crate::wpd::WpdDeviceGuard> =
+        Some(crate::wpd::open_device(device_pnp_id)?);
 
     let total_files = files_to_sync.len();
     let lock_path = get_lock_file_path(storage_dir);
     let mut was_cancelled = false;
+    let mut consecutive_session_errors: usize = 0;
 
     for (index, file_item) in files_to_sync.iter().enumerate() {
         if controller.cancel_sync_flag.load(Ordering::Relaxed) {
@@ -444,71 +527,69 @@ where
         });
 
         let mut active_obj_id = file_item.object_id.clone();
-        let mut stream_res = stream_file_to_disk(
-            &device,
-            &active_obj_id,
-            &dest_path,
-            file_item.size,
-            &controller.abort_or_skip_flag,
-            |copied, total, speed| {
-                on_progress(SyncProgressPayload {
-                    current_file_index: index + 1,
-                    total_files,
-                    filename: file_item.filename.clone(),
-                    relative_path: file_item.relative_path.clone(),
-                    bytes_copied: copied,
-                    total_bytes: total,
-                    status: "copying".to_string(),
-                    speed_bytes_sec: speed,
-                    error: None,
-                });
-                Ok(())
-            },
-        );
+        let mut stream_res = match device.as_ref() {
+            Some(dev) => stream_with_progress(
+                dev,
+                &active_obj_id,
+                &dest_path,
+                file_item,
+                index,
+                total_files,
+                &controller.abort_or_skip_flag,
+                &mut on_progress,
+            ),
+            None => Err("Device session is unavailable".to_string()),
+        };
 
-        // If transfer failed not due to user abort, try resolving fresh object ID or reconnecting
+        // If transfer failed due to a recoverable WPD/MTP error, reset the WPD session
+        // (closing the old handle first) and/or resolve a fresh object ID before retrying.
         if let Err(ref err) = stream_res
             && !controller.abort_or_skip_flag.load(Ordering::Relaxed)
             && !controller.cancel_sync_flag.load(Ordering::Relaxed)
+            && is_recoverable_wpd_error(err)
         {
-            let is_conn_err = err.contains("0x8007001F")
-                || err.contains("0x80070015")
-                || err.contains("Failed to get device content")
-                || err.contains("Failed to get IPortableDeviceResources");
+            consecutive_session_errors += 1;
+            let mut reopened = false;
 
-            if is_conn_err {
-                // Try to re-open the device connection
-                if let Ok(new_dev) = crate::wpd::open_device(device_pnp_id) {
-                    device = new_dev;
+            if should_reopen_session(consecutive_session_errors) {
+                drop(device.take());
+                interruptible_sleep(SESSION_REOPEN_DELAY_MS, controller);
+
+                if !controller.abort_or_skip_flag.load(Ordering::Relaxed)
+                    && !controller.cancel_sync_flag.load(Ordering::Relaxed)
+                    && let Ok(new_dev) = crate::wpd::open_device(device_pnp_id)
+                {
+                    device = Some(new_dev);
+                    reopened = true;
                 }
             }
 
-            // If object id was stale or stream failed, attempt to locate object by its relative path
-            if let Ok(Some(fresh_id)) =
-                crate::wpd::find_object_id_by_path(&device, &file_item.relative_path)
+            if let Some(ref dev) = device
+                && !controller.abort_or_skip_flag.load(Ordering::Relaxed)
+                && !controller.cancel_sync_flag.load(Ordering::Relaxed)
             {
-                active_obj_id = fresh_id;
-                stream_res = stream_file_to_disk(
-                    &device,
-                    &active_obj_id,
-                    &dest_path,
-                    file_item.size,
-                    &controller.abort_or_skip_flag,
-                    |copied, total, speed| {
-                        on_progress(SyncProgressPayload {
-                            current_file_index: index + 1,
-                            total_files,
-                            filename: file_item.filename.clone(),
-                            relative_path: file_item.relative_path.clone(),
-                            bytes_copied: copied,
-                            total_bytes: total,
-                            status: "copying".to_string(),
-                            speed_bytes_sec: speed,
-                            error: None,
-                        });
-                        Ok(())
-                    },
-                );
+                let mut resolved_new_id = false;
+                if (reopened || consecutive_session_errors <= MAX_EAGER_SESSION_REOPENS)
+                    && let Ok(Some(fresh_id)) =
+                        crate::wpd::find_object_id_by_path(dev, &file_item.relative_path)
+                    && fresh_id != active_obj_id
+                {
+                    active_obj_id = fresh_id;
+                    resolved_new_id = true;
+                }
+
+                if reopened || resolved_new_id {
+                    stream_res = stream_with_progress(
+                        dev,
+                        &active_obj_id,
+                        &dest_path,
+                        file_item,
+                        index,
+                        total_files,
+                        &controller.abort_or_skip_flag,
+                        &mut on_progress,
+                    );
+                }
             }
         }
 
@@ -536,6 +617,7 @@ where
 
         match stream_res {
             Ok(()) => {
+                consecutive_session_errors = 0;
                 on_progress(SyncProgressPayload {
                     current_file_index: index + 1,
                     total_files,
@@ -571,6 +653,18 @@ where
                         error: Some("Skipped by user".to_string()),
                     });
                 } else {
+                    let final_err = if consecutive_session_errors >= MAX_EAGER_SESSION_REOPENS
+                        && err.to_ascii_lowercase().contains("0x8007065d")
+                        && !err.contains("hint:")
+                    {
+                        format!(
+                            "{} (hint: ensure iCloud 'Download and Keep Originals' is enabled, 'Transfer to Mac or PC' is 'Keep Originals', and try a direct USB port)",
+                            err
+                        )
+                    } else {
+                        err
+                    };
+
                     on_progress(SyncProgressPayload {
                         current_file_index: index + 1,
                         total_files,
@@ -580,7 +674,7 @@ where
                         total_bytes: file_item.size,
                         status: "error".to_string(),
                         speed_bytes_sec: 0.0,
-                        error: Some(err),
+                        error: Some(final_err),
                     });
                 }
             }
@@ -605,4 +699,111 @@ where
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_recoverable_wpd_error() {
+        assert!(is_recoverable_wpd_error(
+            "Failed to get file stream for o54CA: Die angegebenen Daten haben den falschen Typ. (0x8007065D)"
+        ));
+        assert!(is_recoverable_wpd_error("some error 0x8007065d"));
+        assert!(is_recoverable_wpd_error("Device fault 0x8007001F"));
+        assert!(is_recoverable_wpd_error("Not ready 0x80070015"));
+        assert!(is_recoverable_wpd_error("Stream read error: E_FAIL"));
+        assert!(is_recoverable_wpd_error(
+            "Incomplete transfer: received 10 of 20 bytes"
+        ));
+
+        assert!(!is_recoverable_wpd_error("Disk write error: Access denied"));
+        assert!(!is_recoverable_wpd_error("Aborted by user"));
+    }
+
+    #[test]
+    fn test_should_reopen_session_backoff_schedule() {
+        assert!(!should_reopen_session(0));
+        assert!(should_reopen_session(1));
+        assert!(should_reopen_session(2));
+        assert!(should_reopen_session(3));
+        assert!(!should_reopen_session(4));
+        assert!(!should_reopen_session(24));
+        assert!(should_reopen_session(25));
+        assert!(!should_reopen_session(26));
+        assert!(should_reopen_session(50));
+    }
+
+    #[test]
+    fn test_new_variant_and_normalization() {
+        assert_eq!(
+            normalize_rel_path("\\DCIM\\100APPLE\\IMG_1234.HEIC"),
+            "DCIM/100APPLE/IMG_1234.HEIC"
+        );
+        assert_eq!(
+            get_new_variant_rel_path("DCIM/100APPLE/IMG_1234.HEIC"),
+            "DCIM/100APPLE/IMG_1234_new.HEIC"
+        );
+    }
+
+    #[test]
+    fn test_diff_and_classify_files() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("iphone_backup_sync_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let iphone_files = vec![
+            DeviceFile {
+                object_id: "o1".to_string(),
+                relative_path: "DCIM/100APPLE/IMG_0001.JPG".to_string(),
+                filename: "IMG_0001.JPG".to_string(),
+                size: 100,
+            },
+            DeviceFile {
+                object_id: "o2".to_string(),
+                relative_path: "DCIM/100APPLE/IMG_0002.JPG".to_string(),
+                filename: "IMG_0002.JPG".to_string(),
+                size: 200,
+            },
+            DeviceFile {
+                object_id: "o3".to_string(),
+                relative_path: "DCIM/100APPLE/IMG_0003.JPG".to_string(),
+                filename: "IMG_0003.JPG".to_string(),
+                size: 300,
+            },
+        ];
+
+        let mut backup_index = HashMap::new();
+        backup_index.insert(
+            "dcim/100apple/img_0001.jpg".to_string(),
+            BackupFileInfo {
+                actual_relative_path: "DCIM/100APPLE/IMG_0001.JPG".to_string(),
+                size: 100,
+            },
+        );
+        backup_index.insert(
+            "dcim/100apple/img_0002.jpg".to_string(),
+            BackupFileInfo {
+                actual_relative_path: "DCIM/100APPLE/IMG_0002.JPG".to_string(),
+                size: 150,
+            },
+        );
+
+        let cancel = AtomicBool::new(false);
+        let result =
+            diff_and_classify_files(&iphone_files, &backup_index, &temp_dir, &cancel, |_, _| {})
+                .unwrap();
+
+        assert_eq!(result.summary.verified_ignored_count, 1);
+        assert_eq!(result.summary.mismatch_count, 1);
+        assert_eq!(result.summary.new_count, 1);
+        assert_eq!(
+            result.files[1].target_relative_path,
+            "DCIM/100APPLE/IMG_0002_new.JPG"
+        );
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
 }

@@ -34,7 +34,21 @@ const isRefreshingDevices = ref(false)
 const isScanning = ref(false)
 const scanProgress = ref<ScanProgressPayload | null>(null)
 const scannedFiles = ref<ScannedFile[]>([])
+let scannedFileIndexByPath = new Map<string, number>()
 const skipList = ref<string[]>([])
+
+function rebuildScannedFileIndex(files: ScannedFile[]) {
+  const next = new Map<string, number>()
+  for (let i = 0; i < files.length; i++) {
+    next.set(files[i].relative_path, i)
+  }
+  scannedFileIndexByPath = next
+}
+
+function findScannedFile(relativePath: string): ScannedFile | undefined {
+  const idx = scannedFileIndexByPath.get(relativePath)
+  return idx !== undefined ? scannedFiles.value[idx] : undefined
+}
 const summary = ref<ScanSummary>({
   total_iphone_files: 0,
   total_backup_files: 0,
@@ -136,7 +150,7 @@ async function addToSkipList(path: string) {
       relativePath: path
     })
     skipList.value = updated
-    const file = scannedFiles.value.find((f) => f.relative_path === path)
+    const file = findScannedFile(path)
     if (file) {
       file.status = 'SKIPPED'
       file.error = undefined
@@ -156,7 +170,7 @@ async function removeFromSkipList(path: string) {
     })
     skipList.value = updated
     // Update local state if file is in scanned list
-    const file = scannedFiles.value.find((f) => f.relative_path === path)
+    const file = findScannedFile(path)
     if (file && file.status === 'SKIPPED') {
       if (file.existing_size !== undefined) {
         file.status =
@@ -264,6 +278,7 @@ async function scanDevice() {
       backupDir: backupPath.value
     })
     scannedFiles.value = result.files
+    rebuildScannedFileIndex(result.files)
     summary.value = {
       ...result.summary,
       error_count: 0
@@ -566,19 +581,18 @@ onMounted(async () => {
       if (event.payload.status === 'copying') {
         isSyncing.value = true
       } else if (event.payload.status === 'completed') {
-        const f = scannedFiles.value.find(
-          (file) => file.relative_path === event.payload.relative_path
-        )
+        const f = findScannedFile(event.payload.relative_path)
         if (f) {
+          if (f.status !== 'VERIFIED_IGNORED') {
+            summary.value.total_backup_files += 1
+          }
           f.status = 'VERIFIED_IGNORED'
           f.existing_size = f.size
           f.error = undefined
           updateSummaryCounts()
         }
       } else if (event.payload.status === 'skipped') {
-        const f = scannedFiles.value.find(
-          (file) => file.relative_path === event.payload.relative_path
-        )
+        const f = findScannedFile(event.payload.relative_path)
         if (f) {
           f.status = 'SKIPPED'
           if (!skipList.value.includes(event.payload.relative_path)) {
@@ -587,9 +601,7 @@ onMounted(async () => {
           updateSummaryCounts()
         }
       } else if (event.payload.status === 'error') {
-        const f = scannedFiles.value.find(
-          (file) => file.relative_path === event.payload.relative_path
-        )
+        const f = findScannedFile(event.payload.relative_path)
         if (f) {
           f.status = 'ERROR'
           f.error = event.payload.error

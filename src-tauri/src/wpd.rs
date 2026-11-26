@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use windows::Win32::Devices::PortableDevices::*;
 use windows::Win32::System::Com::*;
+use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::core::{PCWSTR, PWSTR};
 
 /// Information identifying an enumerated Windows Portable Device.
@@ -51,15 +52,15 @@ pub fn get_part_path(dest_path: &Path) -> std::path::PathBuf {
 }
 
 /// RAII guard ensuring COM library is initialized for the calling thread and uninitialized on drop.
-pub struct ComGuard;
+pub struct ComGuard {
+    initialized: bool,
+}
 
 impl ComGuard {
     /// Initializes COM multithreaded runtime for the current thread.
     pub fn new() -> Self {
-        unsafe {
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        }
-        ComGuard
+        let initialized = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).is_ok() };
+        ComGuard { initialized }
     }
 }
 
@@ -71,8 +72,10 @@ impl Default for ComGuard {
 
 impl Drop for ComGuard {
     fn drop(&mut self) {
-        unsafe {
-            CoUninitialize();
+        if self.initialized {
+            unsafe {
+                CoUninitialize();
+            }
         }
     }
 }
@@ -184,11 +187,14 @@ pub fn open_device(pnp_id: &str) -> Result<WpdDeviceGuard, String> {
             CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)
                 .map_err(|e| format!("Failed to create IPortableDeviceValues: {}", e))?;
 
+        const GENERIC_READ_ACCESS: u32 = 0x8000_0000;
         let app_name: Vec<u16> = "iPhone Backup Sync\0".encode_utf16().collect();
         let _ = client_info.SetStringValue(&WPD_CLIENT_NAME, PCWSTR(app_name.as_ptr()));
         let _ = client_info.SetUnsignedIntegerValue(&WPD_CLIENT_MAJOR_VERSION, 1);
         let _ = client_info.SetUnsignedIntegerValue(&WPD_CLIENT_MINOR_VERSION, 0);
         let _ = client_info.SetUnsignedIntegerValue(&WPD_CLIENT_REVISION, 0);
+        let _ =
+            client_info.SetUnsignedIntegerValue(&WPD_CLIENT_DESIRED_ACCESS, GENERIC_READ_ACCESS);
 
         let pnp_id_u16: Vec<u16> = pnp_id.encode_utf16().chain(std::iter::once(0)).collect();
         device
@@ -296,23 +302,7 @@ where
                     .unwrap_or_default();
 
                 // Get name: try ORIGINAL_FILE_NAME first, then fallback to OBJECT_NAME
-                let raw_name = match values.GetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
-                    Ok(name_pwstr) => {
-                        let s = name_pwstr.to_string().unwrap_or_default();
-                        CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
-                        s
-                    }
-                    Err(_) => match values.GetStringValue(&WPD_OBJECT_NAME) {
-                        Ok(name_pwstr) => {
-                            let s = name_pwstr.to_string().unwrap_or_default();
-                            CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
-                            s
-                        }
-                        Err(_) => String::new(),
-                    },
-                };
-
-                let clean_name = clean_unicode_markers(&raw_name);
+                let clean_name = read_object_display_name(&values);
                 if clean_name.is_empty() {
                     continue;
                 }
@@ -402,21 +392,7 @@ where
             .Transfer()
             .map_err(|e| format!("Failed to get IPortableDeviceResources: {}", e))?;
 
-        let obj_u16: Vec<u16> = object_id.encode_utf16().chain(std::iter::once(0)).collect();
-        let mut optimal_buffer_size: u32 = 0;
-        let mut stream: Option<IStream> = None;
-
-        resources
-            .GetStream(
-                PCWSTR(obj_u16.as_ptr()),
-                &WPD_RESOURCE_DEFAULT,
-                0, // STGM_READ
-                &mut optimal_buffer_size,
-                &mut stream,
-            )
-            .map_err(|e| format!("Failed to get file stream for {}: {}", object_id, e))?;
-
-        let stream = stream.ok_or_else(|| "GetStream returned null stream".to_string())?;
+        let (stream, optimal_buffer_size) = open_object_stream(&resources, object_id)?;
 
         // Create parent folder if not present
         if let Some(parent) = dest_path.parent() {
@@ -504,6 +480,217 @@ where
     }
 }
 
+fn property_key_eq(a: &PROPERTYKEY, b: &PROPERTYKEY) -> bool {
+    a.fmtid == b.fmtid && a.pid == b.pid
+}
+
+/// Reads an object's display name (`WPD_OBJECT_ORIGINAL_FILE_NAME` falling back to
+/// `WPD_OBJECT_NAME`) and strips invisible directional Unicode markers.
+unsafe fn read_object_display_name(values: &IPortableDeviceValues) -> String {
+    let raw_name = unsafe {
+        match values.GetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
+            Ok(name_pwstr) => {
+                let s = name_pwstr.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
+                s
+            }
+            Err(_) => match values.GetStringValue(&WPD_OBJECT_NAME) {
+                Ok(name_pwstr) => {
+                    let s = name_pwstr.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
+                    s
+                }
+                Err(_) => String::new(),
+            },
+        }
+    };
+    clean_unicode_markers(&raw_name)
+}
+
+/// Opens a read-only `IStream` for a WPD object, checking `GetSupportedResources`
+/// and falling back to `WPD_RESOURCE_GENERIC` only when `WPD_RESOURCE_DEFAULT` is absent.
+unsafe fn open_object_stream(
+    resources: &IPortableDeviceResources,
+    object_id: &str,
+) -> Result<(IStream, u32), String> {
+    let obj_u16: Vec<u16> = object_id.encode_utf16().chain(std::iter::once(0)).collect();
+    let pc_obj = PCWSTR(obj_u16.as_ptr());
+
+    let mut optimal_buffer_size: u32 = 0;
+    let mut stream: Option<IStream> = None;
+
+    let primary_err = match unsafe {
+        resources.GetStream(
+            pc_obj,
+            &WPD_RESOURCE_DEFAULT,
+            0, // STGM_READ
+            &mut optimal_buffer_size,
+            &mut stream,
+        )
+    } {
+        Ok(()) => {
+            let s = stream.ok_or_else(|| "GetStream returned null stream".to_string())?;
+            return Ok((s, optimal_buffer_size));
+        }
+        Err(e) => e,
+    };
+
+    let mut diag_note: Option<String> = None;
+
+    if let Ok(keys) = unsafe { resources.GetSupportedResources(pc_obj) } {
+        let mut resource_count: u32 = 0;
+        let _ = unsafe { keys.GetCount((&raw mut resource_count).cast_const()) };
+
+        let mut has_default = false;
+        let mut has_generic = false;
+        for idx in 0..resource_count {
+            let mut key = PROPERTYKEY::default();
+            if unsafe { keys.GetAt(idx, (&raw mut key).cast_const()) }.is_ok() {
+                if property_key_eq(&key, &WPD_RESOURCE_DEFAULT) {
+                    has_default = true;
+                } else if property_key_eq(&key, &WPD_RESOURCE_GENERIC) {
+                    has_generic = true;
+                }
+            }
+        }
+
+        if !has_default && has_generic {
+            let mut gen_buf_size: u32 = 0;
+            let mut gen_stream: Option<IStream> = None;
+            if unsafe {
+                resources.GetStream(
+                    pc_obj,
+                    &WPD_RESOURCE_GENERIC,
+                    0, // STGM_READ
+                    &mut gen_buf_size,
+                    &mut gen_stream,
+                )
+            }
+            .is_ok()
+                && let Some(s) = gen_stream
+            {
+                return Ok((s, gen_buf_size));
+            }
+        }
+
+        if !has_default && !has_generic {
+            diag_note = Some(format!(
+                "default data stream unavailable ({} supported resource(s) on object)",
+                resource_count
+            ));
+        } else if has_default
+            && let Ok(attrs) =
+                unsafe { resources.GetResourceAttributes(pc_obj, &WPD_RESOURCE_DEFAULT) }
+            && let Ok(can_read) = unsafe { attrs.GetBoolValue(&WPD_RESOURCE_ATTRIBUTE_CAN_READ) }
+            && !can_read.as_bool()
+        {
+            diag_note = Some("default resource reports CAN_READ=false".to_string());
+        }
+    }
+
+    let base_msg = format!(
+        "Failed to get file stream for {}: {}",
+        object_id, primary_err
+    );
+    match diag_note {
+        Some(note) => Err(format!("{} [{}]", base_msg, note)),
+        None => Err(base_msg),
+    }
+}
+
+unsafe fn create_lookup_property_keys() -> Option<IPortableDeviceKeyCollection> {
+    let keys: IPortableDeviceKeyCollection =
+        unsafe { CoCreateInstance(&PortableDeviceKeyCollection, None, CLSCTX_INPROC_SERVER) }
+            .ok()?;
+    unsafe {
+        let _ = keys.Add(&WPD_OBJECT_ORIGINAL_FILE_NAME);
+        let _ = keys.Add(&WPD_OBJECT_NAME);
+        let _ = keys.Add(&WPD_OBJECT_CONTENT_TYPE);
+    }
+    Some(keys)
+}
+
+unsafe fn resolve_path_from_parent(
+    content: &IPortableDeviceContent,
+    properties: &IPortableDeviceProperties,
+    lookup_keys: Option<&IPortableDeviceKeyCollection>,
+    root_parent_id: &str,
+    parts: &[&str],
+) -> Option<String> {
+    let mut current_parent = root_parent_id.to_string();
+
+    for (i, &segment) in parts.iter().enumerate() {
+        let is_last = i == parts.len() - 1;
+        let current_parent_u16: Vec<u16> = current_parent
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let enum_sub: IEnumPortableDeviceObjectIDs =
+            match unsafe { content.EnumObjects(0, PCWSTR(current_parent_u16.as_ptr()), None) } {
+                Ok(e) => e,
+                Err(_) => return None,
+            };
+
+        let mut matched_child: Option<(String, bool)> = None;
+
+        loop {
+            let mut sub_ids: [PWSTR; 32] = [PWSTR::null(); 32];
+            let mut sub_fetched: u32 = 0;
+            let sub_hr = unsafe { enum_sub.Next(&mut sub_ids, &mut sub_fetched) };
+            if sub_hr.is_err() || sub_fetched == 0 {
+                break;
+            }
+
+            for &child_pwstr in sub_ids.iter().take(sub_fetched as usize) {
+                if child_pwstr.is_null() {
+                    continue;
+                }
+                let child_id = unsafe { child_pwstr.to_string() }.unwrap_or_default();
+                unsafe { CoTaskMemFree(Some(child_pwstr.as_ptr() as *const _)) };
+
+                if child_id.is_empty() || matched_child.is_some() {
+                    continue;
+                }
+
+                let child_u16: Vec<u16> =
+                    child_id.encode_utf16().chain(std::iter::once(0)).collect();
+                let pc_child = PCWSTR(child_u16.as_ptr());
+
+                if let Ok(values) = unsafe { properties.GetValues(pc_child, lookup_keys) } {
+                    let clean_child_name = unsafe { read_object_display_name(&values) };
+                    if clean_child_name.eq_ignore_ascii_case(segment) {
+                        let content_type = unsafe { values.GetGuidValue(&WPD_OBJECT_CONTENT_TYPE) }
+                            .unwrap_or_default();
+                        let is_folder = content_type == WPD_CONTENT_TYPE_FOLDER
+                            || content_type == WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT;
+                        matched_child = Some((child_id, is_folder));
+                    }
+                }
+            }
+
+            if matched_child.is_some() || sub_hr == windows::core::HRESULT(1) {
+                break;
+            }
+        }
+
+        match matched_child {
+            Some((child_id, is_folder)) => {
+                if is_last {
+                    return Some(child_id);
+                }
+                if !is_folder {
+                    return None;
+                }
+                current_parent = child_id;
+            }
+            None => return None,
+        }
+    }
+
+    None
+}
+
 /// Look up an object's current WPD object ID by its relative path (e.g. "DCIM/100APPLE/IMG_1234.JPG").
 /// This acts as a reliable fallback if cached object IDs become stale between scan and transfer sessions.
 pub fn find_object_id_by_path(
@@ -528,119 +715,46 @@ pub fn find_object_id_by_path(
         let properties = content
             .Properties()
             .map_err(|e| format!("Failed to get content properties: {}", e))?;
+        let lookup_keys = create_lookup_property_keys();
 
-        // 1. Locate the storage container under "DEVICE"
+        // 1. Enumerate all top-level storage containers under "DEVICE"
         let parent_id_u16: Vec<u16> = "DEVICE".encode_utf16().chain(std::iter::once(0)).collect();
         let enum_objects: IEnumPortableDeviceObjectIDs = content
             .EnumObjects(0, PCWSTR(parent_id_u16.as_ptr()), None)
             .map_err(|e| format!("Failed to enumerate DEVICE objects: {}", e))?;
 
-        let mut storage_id: Option<String> = None;
-        let mut object_ids: [PWSTR; 16] = [PWSTR::null(); 16];
-        let mut fetched: u32 = 0;
-        let hr = enum_objects.Next(&mut object_ids, &mut fetched);
-        if hr.is_ok() && fetched > 0 {
+        let mut storage_ids: Vec<String> = Vec::new();
+        loop {
+            let mut object_ids: [PWSTR; 16] = [PWSTR::null(); 16];
+            let mut fetched: u32 = 0;
+            let hr = enum_objects.Next(&mut object_ids, &mut fetched);
+            if hr.is_err() || fetched == 0 {
+                break;
+            }
             for &obj_pwstr in object_ids.iter().take(fetched as usize) {
                 if !obj_pwstr.is_null() {
                     let id_str = obj_pwstr.to_string().unwrap_or_default();
                     CoTaskMemFree(Some(obj_pwstr.as_ptr() as *const _));
-                    if storage_id.is_none() && !id_str.is_empty() {
-                        storage_id = Some(id_str);
+                    if !id_str.is_empty() {
+                        storage_ids.push(id_str);
                     }
                 }
+            }
+            if hr == windows::core::HRESULT(1) {
+                break;
             }
         }
 
-        let storage_id = match storage_id {
-            Some(id) => id,
-            None => return Ok(None),
-        };
-
-        // 2. Traverse down through path segments (e.g. "DCIM" -> "100APPLE" -> "IMG_1234.JPG")
-        let mut current_parent = storage_id;
-        for (i, &segment) in parts.iter().enumerate() {
-            let is_last = i == parts.len() - 1;
-            let current_parent_u16: Vec<u16> = current_parent
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
-
-            let enum_sub: IEnumPortableDeviceObjectIDs =
-                match content.EnumObjects(0, PCWSTR(current_parent_u16.as_ptr()), None) {
-                    Ok(e) => e,
-                    Err(_) => return Ok(None),
-                };
-
-            let mut matched_child: Option<(String, bool)> = None;
-
-            loop {
-                let mut sub_ids: [PWSTR; 32] = [PWSTR::null(); 32];
-                let mut sub_fetched: u32 = 0;
-                let sub_hr = enum_sub.Next(&mut sub_ids, &mut sub_fetched);
-                if sub_hr.is_err() || sub_fetched == 0 {
-                    break;
-                }
-
-                for &child_pwstr in sub_ids.iter().take(sub_fetched as usize) {
-                    if child_pwstr.is_null() {
-                        continue;
-                    }
-                    let child_id = child_pwstr.to_string().unwrap_or_default();
-                    CoTaskMemFree(Some(child_pwstr.as_ptr() as *const _));
-
-                    if child_id.is_empty() || matched_child.is_some() {
-                        continue;
-                    }
-
-                    let child_u16: Vec<u16> =
-                        child_id.encode_utf16().chain(std::iter::once(0)).collect();
-                    let pc_child = PCWSTR(child_u16.as_ptr());
-
-                    if let Ok(values) = properties.GetValues(pc_child, None) {
-                        let raw_name = match values.GetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
-                            Ok(name_pwstr) => {
-                                let s = name_pwstr.to_string().unwrap_or_default();
-                                CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
-                                s
-                            }
-                            Err(_) => match values.GetStringValue(&WPD_OBJECT_NAME) {
-                                Ok(name_pwstr) => {
-                                    let s = name_pwstr.to_string().unwrap_or_default();
-                                    CoTaskMemFree(Some(name_pwstr.as_ptr() as *const _));
-                                    s
-                                }
-                                Err(_) => String::new(),
-                            },
-                        };
-
-                        let clean_child_name = clean_unicode_markers(&raw_name);
-                        if clean_child_name.eq_ignore_ascii_case(segment) {
-                            let content_type = values
-                                .GetGuidValue(&WPD_OBJECT_CONTENT_TYPE)
-                                .unwrap_or_default();
-                            let is_folder = content_type == WPD_CONTENT_TYPE_FOLDER
-                                || content_type == WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT;
-                            matched_child = Some((child_id, is_folder));
-                        }
-                    }
-                }
-
-                if matched_child.is_some() || sub_hr == windows::core::HRESULT(1) {
-                    break;
-                }
-            }
-
-            match matched_child {
-                Some((child_id, is_folder)) => {
-                    if is_last {
-                        return Ok(Some(child_id));
-                    }
-                    if !is_folder {
-                        return Ok(None);
-                    }
-                    current_parent = child_id;
-                }
-                None => return Ok(None),
+        // 2. Traverse down through path segments under each storage container
+        for storage_id in storage_ids {
+            if let Some(found) = resolve_path_from_parent(
+                &content,
+                &properties,
+                lookup_keys.as_ref(),
+                &storage_id,
+                &parts,
+            ) {
+                return Ok(Some(found));
             }
         }
 
