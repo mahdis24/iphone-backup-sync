@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import {
+  ref,
+  shallowRef,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted
+} from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 import type {
   DeviceInfo,
+  FileClassification,
   ScannedFile,
   ScanProgressPayload,
   ScanResult,
@@ -33,9 +41,27 @@ const isRefreshingDevices = ref(false)
 // Scan & File state
 const isScanning = ref(false)
 const scanProgress = ref<ScanProgressPayload | null>(null)
-const scannedFiles = ref<ScannedFile[]>([])
+const scannedFiles = shallowRef<ScannedFile[]>([])
+const filesVersion = ref(0)
+let versionBumpTimer: ReturnType<typeof setTimeout> | null = null
 let scannedFileIndexByPath = new Map<string, number>()
 const skipList = ref<string[]>([])
+
+function scheduleFilesVersionBump() {
+  if (versionBumpTimer !== null) return
+  versionBumpTimer = setTimeout(() => {
+    versionBumpTimer = null
+    filesVersion.value++
+  }, 200)
+}
+
+function flushFilesVersionBump() {
+  if (versionBumpTimer !== null) {
+    clearTimeout(versionBumpTimer)
+    versionBumpTimer = null
+  }
+  filesVersion.value++
+}
 
 function rebuildScannedFileIndex(files: ScannedFile[]) {
   const next = new Map<string, number>()
@@ -61,6 +87,7 @@ const summary = ref<ScanSummary>({
 
 // Sync state
 const isSyncing = ref(false)
+const isCancellingSync = ref(false)
 const currentProgress = ref<SyncProgressPayload | null>(null)
 const syncError = ref<string | null>(null)
 const syncNotice = ref<string | null>(null)
@@ -69,6 +96,52 @@ const syncNotice = ref<string | null>(null)
 type TabType = 'pending' | 'new' | 'mismatch' | 'errors' | 'skiplist' | 'all'
 const activeTab = ref<TabType>('pending')
 const searchQuery = ref('')
+
+// Virtual table state
+const ROW_HEIGHT = 44
+const OVERSCAN_ROWS = 12
+const tableContainerRef = ref<HTMLElement | null>(null)
+const tableScrollTop = ref(0)
+const tableViewportHeight = ref(600)
+let tableResizeObserver: ResizeObserver | null = null
+
+function handleTableScroll() {
+  if (tableContainerRef.value) {
+    tableScrollTop.value = tableContainerRef.value.scrollTop
+  }
+}
+
+function resetTableScroll() {
+  tableScrollTop.value = 0
+  if (tableContainerRef.value) {
+    tableContainerRef.value.scrollTop = 0
+  }
+}
+
+watch(tableContainerRef, (el) => {
+  if (tableResizeObserver) {
+    tableResizeObserver.disconnect()
+    tableResizeObserver = null
+  }
+  if (el) {
+    tableViewportHeight.value = el.clientHeight || 600
+    tableResizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.height > 0) {
+          tableViewportHeight.value = entry.contentRect.height
+        }
+      }
+    })
+    tableResizeObserver.observe(el)
+  }
+})
+
+watch([activeTab, searchQuery], () => {
+  resetTableScroll()
+  if (versionBumpTimer !== null) {
+    flushFilesVersionBump()
+  }
+})
 
 // Custom Context Menu state
 const contextMenuVisible = ref(false)
@@ -152,9 +225,8 @@ async function addToSkipList(path: string) {
     skipList.value = updated
     const file = findScannedFile(path)
     if (file) {
-      file.status = 'SKIPPED'
-      file.error = undefined
-      updateSummaryCounts()
+      transitionFileStatus(file, 'SKIPPED')
+      flushFilesVersionBump()
     }
     syncNotice.value = `File "${path.split('/').pop()}" added to skip list.`
   } catch (err: unknown) {
@@ -172,14 +244,14 @@ async function removeFromSkipList(path: string) {
     // Update local state if file is in scanned list
     const file = findScannedFile(path)
     if (file && file.status === 'SKIPPED') {
-      if (file.existing_size !== undefined) {
-        file.status =
-          file.existing_size === file.size ? 'VERIFIED_IGNORED' : 'MISMATCH'
-      } else {
-        file.status = 'NEW'
-      }
-      file.error = undefined
-      updateSummaryCounts()
+      const restoredStatus: FileClassification =
+        file.existing_size !== undefined ?
+          file.existing_size === file.size ?
+            'VERIFIED_IGNORED'
+          : 'MISMATCH'
+        : 'NEW'
+      transitionFileStatus(file, restoredStatus)
+      flushFilesVersionBump()
     }
     syncNotice.value = `File "${path.split('/').pop()}" removed from skip list.`
   } catch (err: unknown) {
@@ -205,6 +277,7 @@ async function clearAllSkipList() {
       }
     }
     updateSummaryCounts()
+    flushFilesVersionBump()
     syncNotice.value = 'Skip list cleared.'
   } catch (err) {
     console.error('Failed to clear skip list:', err)
@@ -279,6 +352,8 @@ async function scanDevice() {
     })
     scannedFiles.value = result.files
     rebuildScannedFileIndex(result.files)
+    resetTableScroll()
+    flushFilesVersionBump()
     summary.value = {
       ...result.summary,
       error_count: 0
@@ -331,6 +406,7 @@ async function startSync() {
   }
 
   isSyncing.value = true
+  isCancellingSync.value = false
   syncError.value = null
   syncNotice.value = `Starting sync of ${pending.length} files...`
 
@@ -338,11 +414,12 @@ async function startSync() {
     await invoke('start_sync', {
       deviceId: selectedDevice.value.id,
       backupDir: backupPath.value,
-      files: scannedFiles.value
+      files: pending
     })
   } catch (err: unknown) {
     syncError.value = getErrorMessage(err, 'Sync failed to start')
     isSyncing.value = false
+    isCancellingSync.value = false
     syncNotice.value = null
   }
 }
@@ -371,6 +448,7 @@ async function syncThisFile(file: ScannedFile) {
   }
 
   isSyncing.value = true
+  isCancellingSync.value = false
   syncError.value = null
   syncNotice.value = `Syncing "${file.filename}"...`
 
@@ -383,6 +461,7 @@ async function syncThisFile(file: ScannedFile) {
   } catch (err: unknown) {
     syncError.value = getErrorMessage(err, 'Failed to start file sync')
     isSyncing.value = false
+    isCancellingSync.value = false
     syncNotice.value = null
   }
 }
@@ -430,17 +509,79 @@ async function skipCurrentFile() {
 
 // Stop whole sync
 async function cancelSync() {
-  if (!isSyncing.value) return
+  if (!isSyncing.value || isCancellingSync.value) return
+  isCancellingSync.value = true
   syncNotice.value = 'Stopping synchronization...'
   try {
     await invoke('cancel_sync')
   } catch (err: unknown) {
     console.error('Failed to cancel sync:', err)
+    isCancellingSync.value = false
     isSyncing.value = false
   }
 }
 
-// Helper to recalculate summary numbers
+// O(1) incremental summary update for a single file transition
+function transitionFileStatus(
+  file: ScannedFile,
+  nextStatus: FileClassification,
+  errorMsg?: string
+) {
+  const prevStatus = file.status
+  if (prevStatus !== nextStatus) {
+    if (prevStatus === 'NEW') {
+      summary.value.new_count = Math.max(0, summary.value.new_count - 1)
+    } else if (prevStatus === 'MISMATCH') {
+      summary.value.mismatch_count = Math.max(
+        0,
+        summary.value.mismatch_count - 1
+      )
+    } else if (prevStatus === 'VERIFIED_IGNORED') {
+      summary.value.verified_ignored_count = Math.max(
+        0,
+        summary.value.verified_ignored_count - 1
+      )
+    } else if (prevStatus === 'SKIPPED') {
+      summary.value.skipped_count = Math.max(0, summary.value.skipped_count - 1)
+    } else if (prevStatus === 'ERROR') {
+      summary.value.error_count = Math.max(
+        0,
+        (summary.value.error_count || 0) - 1
+      )
+    }
+
+    if (nextStatus === 'NEW') {
+      summary.value.new_count += 1
+    } else if (nextStatus === 'MISMATCH') {
+      summary.value.mismatch_count += 1
+    } else if (nextStatus === 'VERIFIED_IGNORED') {
+      summary.value.verified_ignored_count += 1
+    } else if (nextStatus === 'SKIPPED') {
+      summary.value.skipped_count += 1
+    } else if (nextStatus === 'ERROR') {
+      summary.value.error_count = (summary.value.error_count || 0) + 1
+    }
+
+    if (
+      nextStatus === 'VERIFIED_IGNORED' &&
+      prevStatus !== 'VERIFIED_IGNORED'
+    ) {
+      summary.value.total_backup_files += 1
+    }
+    file.status = nextStatus
+  }
+
+  if (nextStatus === 'VERIFIED_IGNORED') {
+    file.existing_size = file.size
+    file.error = undefined
+  } else if (nextStatus === 'ERROR') {
+    file.error = errorMsg
+  } else {
+    file.error = undefined
+  }
+}
+
+// Helper to recalculate summary numbers (used for bulk updates like clearAllSkipList)
 function updateSummaryCounts() {
   let news = 0
   let mismatches = 0
@@ -478,6 +619,7 @@ function formatSpeed(bytesPerSec: number): string {
 
 // Filtered file list based on active tab and search query
 const filteredFiles = computed(() => {
+  void filesVersion.value
   let list = scannedFiles.value
 
   if (activeTab.value === 'pending') {
@@ -506,6 +648,30 @@ const filteredFiles = computed(() => {
   }
 
   return list
+})
+
+const visibleRange = computed(() => {
+  const total = filteredFiles.value.length
+  if (total === 0) {
+    return { start: 0, end: 0, topSpacer: 0, bottomSpacer: 0 }
+  }
+  const maxScrollTop = Math.max(0, total * ROW_HEIGHT - tableViewportHeight.value)
+  const clampedScroll = Math.min(tableScrollTop.value, maxScrollTop)
+  const start = Math.max(0, Math.floor(clampedScroll / ROW_HEIGHT) - OVERSCAN_ROWS)
+  const visibleCount =
+    Math.ceil(tableViewportHeight.value / ROW_HEIGHT) + OVERSCAN_ROWS * 2
+  const end = Math.min(total, start + visibleCount)
+  return {
+    start,
+    end,
+    topSpacer: start * ROW_HEIGHT,
+    bottomSpacer: (total - end) * ROW_HEIGHT
+  }
+})
+
+const visibleFiles = computed(() => {
+  const { start, end } = visibleRange.value
+  return filteredFiles.value.slice(start, end)
 })
 
 // File progress percentages
@@ -579,46 +745,51 @@ onMounted(async () => {
       currentProgress.value = event.payload
 
       if (event.payload.status === 'copying') {
-        isSyncing.value = true
+        if (!isCancellingSync.value) {
+          isSyncing.value = true
+        }
       } else if (event.payload.status === 'completed') {
         const f = findScannedFile(event.payload.relative_path)
         if (f) {
-          if (f.status !== 'VERIFIED_IGNORED') {
-            summary.value.total_backup_files += 1
-          }
-          f.status = 'VERIFIED_IGNORED'
-          f.existing_size = f.size
-          f.error = undefined
-          updateSummaryCounts()
+          transitionFileStatus(f, 'VERIFIED_IGNORED')
+          scheduleFilesVersionBump()
         }
       } else if (event.payload.status === 'skipped') {
         const f = findScannedFile(event.payload.relative_path)
         if (f) {
-          f.status = 'SKIPPED'
+          transitionFileStatus(f, 'SKIPPED')
           if (!skipList.value.includes(event.payload.relative_path)) {
             skipList.value.push(event.payload.relative_path)
           }
-          updateSummaryCounts()
+          scheduleFilesVersionBump()
         }
       } else if (event.payload.status === 'error') {
         const f = findScannedFile(event.payload.relative_path)
         if (f) {
-          f.status = 'ERROR'
-          f.error = event.payload.error
-          updateSummaryCounts()
+          transitionFileStatus(f, 'ERROR', event.payload.error)
+          scheduleFilesVersionBump()
         }
         if (event.payload.error) {
           syncError.value = event.payload.error
         }
       } else if (event.payload.status === 'aborted') {
         isSyncing.value = false
-        syncNotice.value =
-          'Sync stopped by user. Incomplete files were removed.'
+        isCancellingSync.value = false
+        flushFilesVersionBump()
+        const abortErr = event.payload.error
+        if (abortErr && !abortErr.toLowerCase().includes('stopped by user')) {
+          syncError.value = abortErr
+          syncNotice.value =
+            'Synchronization aborted due to an error. Incomplete files were removed.'
+        } else {
+          syncNotice.value =
+            'Sync stopped by user. Incomplete files were removed.'
+        }
       } else if (event.payload.status === 'finished') {
         isSyncing.value = false
-        const errorCount = scannedFiles.value.filter(
-          (f) => f.status === 'ERROR'
-        ).length
+        isCancellingSync.value = false
+        flushFilesVersionBump()
+        const errorCount = summary.value.error_count || 0
         if (errorCount > 0) {
           syncNotice.value = `Synchronization finished with ${errorCount} error(s). Right-click failed files to retry or skip.`
         } else {
@@ -635,6 +806,14 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (versionBumpTimer !== null) {
+    clearTimeout(versionBumpTimer)
+    versionBumpTimer = null
+  }
+  if (tableResizeObserver) {
+    tableResizeObserver.disconnect()
+    tableResizeObserver = null
+  }
   window.removeEventListener('contextmenu', handleGlobalContextMenu)
   window.removeEventListener('click', closeContextMenu)
   window.removeEventListener('scroll', closeContextMenu, true)
@@ -844,6 +1023,7 @@ onUnmounted(() => {
             <button
               v-if="isSyncing"
               class="btn btn-danger"
+              :disabled="isCancellingSync"
               title="Stop synchronization immediately"
               @click="cancelSync">
               <svg
@@ -861,7 +1041,7 @@ onUnmounted(() => {
                   rx="2"
                   fill="currentColor"></rect>
               </svg>
-              <span>Stop Sync</span>
+              <span>{{ isCancellingSync ? 'Stopping...' : 'Stop Sync' }}</span>
             </button>
           </div>
         </div>
@@ -1304,7 +1484,11 @@ onUnmounted(() => {
         </div>
 
         <!-- Normal Files Table -->
-        <div v-else class="table-container">
+        <div
+          v-else
+          ref="tableContainerRef"
+          class="table-container"
+          @scroll.passive="handleTableScroll">
           <div v-if="scannedFiles.length === 0" class="empty-state">
             <svg
               viewBox="0 0 24 24"
@@ -1347,7 +1531,7 @@ onUnmounted(() => {
           <table v-else class="data-table">
             <thead>
               <tr>
-                <th style="width: 50px">#</th>
+                <th style="width: 64px">#</th>
                 <th style="width: 200px">Filename</th>
                 <th>Path on iPhone</th>
                 <th style="width: 100px">Size</th>
@@ -1356,9 +1540,19 @@ onUnmounted(() => {
               </tr>
             </thead>
             <tbody>
+              <tr v-if="visibleRange.topSpacer > 0" class="virtual-spacer">
+                <td
+                  colspan="6"
+                  :style="{
+                    height: `${visibleRange.topSpacer}px`,
+                    padding: 0,
+                    border: 0
+                  }"></td>
+              </tr>
               <tr
-                v-for="(file, idx) in filteredFiles"
+                v-for="(file, idx) in visibleFiles"
                 :key="file.object_id"
+                class="data-row"
                 :class="{
                   'row-new': file.status === 'NEW',
                   'row-mismatch': file.status === 'MISMATCH',
@@ -1369,7 +1563,7 @@ onUnmounted(() => {
                     contextMenuFile?.object_id === file.object_id
                 }"
                 @contextmenu.prevent.stop="openRowContextMenu($event, file)">
-                <td class="col-idx">{{ idx + 1 }}</td>
+                <td class="col-idx">{{ visibleRange.start + idx + 1 }}</td>
                 <td class="col-name font-semibold" :title="file.filename">
                   <span class="file-ext-icon">{{
                     file.filename.split('.').pop()?.toUpperCase()
@@ -1421,6 +1615,15 @@ onUnmounted(() => {
                     {{ file.error }}
                   </div>
                 </td>
+              </tr>
+              <tr v-if="visibleRange.bottomSpacer > 0" class="virtual-spacer">
+                <td
+                  colspan="6"
+                  :style="{
+                    height: `${visibleRange.bottomSpacer}px`,
+                    padding: 0,
+                    border: 0
+                  }"></td>
               </tr>
             </tbody>
           </table>
@@ -2116,6 +2319,21 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-bottom: 1px solid #1c202d;
   color: #cbd5e1;
+}
+
+.data-table tbody tr.data-row {
+  height: 44px;
+}
+
+.data-table tbody tr.data-row td {
+  height: 44px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.data-table tbody tr.virtual-spacer:hover {
+  background: transparent;
 }
 
 .data-table tbody tr:hover {

@@ -378,6 +378,16 @@ const SESSION_REOPEN_DELAY_MS: u64 = 250;
 const MAX_EAGER_SESSION_REOPENS: usize = 3;
 const PERIODIC_REOPEN_INTERVAL: usize = 25;
 
+/// Returns `true` when a destination filesystem error indicates out-of-space
+/// or a fatal storage condition where retrying remaining files cannot succeed.
+pub fn is_fatal_disk_error(err: &str) -> bool {
+    let lower = err.to_ascii_lowercase();
+    lower.contains("disk full")
+        || lower.contains("os error 112")
+        || lower.contains("os error 39")
+        || lower.contains("not enough space")
+}
+
 /// Returns `true` when a WPD/MTP error may stem from a stale object ID,
 /// wedged MTP session, or transient device communication fault.
 pub fn is_recoverable_wpd_error(err: &str) -> bool {
@@ -427,6 +437,7 @@ fn stream_with_progress<F>(
     index: usize,
     total_files: usize,
     abort_flag: &AtomicBool,
+    last_copy_emit: &mut Option<std::time::Instant>,
     on_progress: &mut F,
 ) -> Result<(), String>
 where
@@ -439,6 +450,7 @@ where
         file_item.size,
         abort_flag,
         |copied, total, speed| {
+            *last_copy_emit = Some(std::time::Instant::now());
             on_progress(SyncProgressPayload {
                 current_file_index: index + 1,
                 total_files,
@@ -473,22 +485,13 @@ where
     let total_files = files_to_sync.len();
     let lock_path = get_lock_file_path(storage_dir);
     let mut was_cancelled = false;
+    let mut fatal_abort_error: Option<String> = None;
     let mut consecutive_session_errors: usize = 0;
+    let mut last_copy_emit: Option<std::time::Instant> = None;
 
     for (index, file_item) in files_to_sync.iter().enumerate() {
         if controller.cancel_sync_flag.load(Ordering::Relaxed) {
             was_cancelled = true;
-            on_progress(SyncProgressPayload {
-                current_file_index: index,
-                total_files,
-                filename: file_item.filename.clone(),
-                relative_path: file_item.relative_path.clone(),
-                bytes_copied: 0,
-                total_bytes: file_item.size,
-                status: "aborted".to_string(),
-                speed_bytes_sec: 0.0,
-                error: Some("Sync stopped by user".to_string()),
-            });
             break;
         }
 
@@ -513,18 +516,21 @@ where
             let _ = fs::write(&lock_path, lock_json);
         }
 
-        // Emit starting progress
-        on_progress(SyncProgressPayload {
-            current_file_index: index + 1,
-            total_files,
-            filename: file_item.filename.clone(),
-            relative_path: file_item.relative_path.clone(),
-            bytes_copied: 0,
-            total_bytes: file_item.size,
-            status: "copying".to_string(),
-            speed_bytes_sec: 0.0,
-            error: None,
-        });
+        // Throttle initial "copying" events across rapid small files so IPC queues never back up
+        if last_copy_emit.is_none_or(|t| t.elapsed().as_millis() >= 100) {
+            last_copy_emit = Some(std::time::Instant::now());
+            on_progress(SyncProgressPayload {
+                current_file_index: index + 1,
+                total_files,
+                filename: file_item.filename.clone(),
+                relative_path: file_item.relative_path.clone(),
+                bytes_copied: 0,
+                total_bytes: file_item.size,
+                status: "copying".to_string(),
+                speed_bytes_sec: 0.0,
+                error: None,
+            });
+        }
 
         let mut active_obj_id = file_item.object_id.clone();
         let mut stream_res = match device.as_ref() {
@@ -536,6 +542,7 @@ where
                 index,
                 total_files,
                 &controller.abort_or_skip_flag,
+                &mut last_copy_emit,
                 &mut on_progress,
             ),
             None => Err("Device session is unavailable".to_string()),
@@ -570,8 +577,11 @@ where
             {
                 let mut resolved_new_id = false;
                 if (reopened || consecutive_session_errors <= MAX_EAGER_SESSION_REOPENS)
-                    && let Ok(Some(fresh_id)) =
-                        crate::wpd::find_object_id_by_path(dev, &file_item.relative_path)
+                    && let Ok(Some(fresh_id)) = crate::wpd::find_object_id_by_path(
+                        dev,
+                        &file_item.relative_path,
+                        &controller.abort_or_skip_flag,
+                    )
                     && fresh_id != active_obj_id
                 {
                     active_obj_id = fresh_id;
@@ -587,6 +597,7 @@ where
                         index,
                         total_files,
                         &controller.abort_or_skip_flag,
+                        &mut last_copy_emit,
                         &mut on_progress,
                     );
                 }
@@ -601,17 +612,6 @@ where
             was_cancelled = true;
             remove_part_file(&dest_path);
             // DO NOT add to skip list! This was a stop/cancel, not a skip.
-            on_progress(SyncProgressPayload {
-                current_file_index: index + 1,
-                total_files,
-                filename: file_item.filename.clone(),
-                relative_path: file_item.relative_path.clone(),
-                bytes_copied: 0,
-                total_bytes: file_item.size,
-                status: "aborted".to_string(),
-                speed_bytes_sec: 0.0,
-                error: Some("Sync stopped by user".to_string()),
-            });
             break;
         }
 
@@ -653,6 +653,7 @@ where
                         error: Some("Skipped by user".to_string()),
                     });
                 } else {
+                    let is_disk_full = is_fatal_disk_error(&err);
                     let final_err = if consecutive_session_errors >= MAX_EAGER_SESSION_REOPENS
                         && err.to_ascii_lowercase().contains("0x8007065d")
                         && !err.contains("hint:")
@@ -674,14 +675,30 @@ where
                         total_bytes: file_item.size,
                         status: "error".to_string(),
                         speed_bytes_sec: 0.0,
-                        error: Some(final_err),
+                        error: Some(final_err.clone()),
                     });
+
+                    if is_disk_full {
+                        fatal_abort_error = Some(format!(
+                            "{} (Sync stopped automatically because the destination disk is full)",
+                            final_err
+                        ));
+                        break;
+                    }
                 }
             }
         }
     }
 
     // Always emit a terminal batch event so the frontend knows the process has definitely finished
+    let (terminal_status, terminal_error) = if let Some(fatal_err) = fatal_abort_error {
+        ("aborted".to_string(), Some(fatal_err))
+    } else if was_cancelled {
+        ("aborted".to_string(), Some("Sync stopped by user".to_string()))
+    } else {
+        ("finished".to_string(), None)
+    };
+
     on_progress(SyncProgressPayload {
         current_file_index: total_files,
         total_files,
@@ -689,13 +706,9 @@ where
         relative_path: String::new(),
         bytes_copied: 0,
         total_bytes: 0,
-        status: if was_cancelled {
-            "aborted".to_string()
-        } else {
-            "finished".to_string()
-        },
+        status: terminal_status,
         speed_bytes_sec: 0.0,
-        error: None,
+        error: terminal_error,
     });
 
     Ok(())
@@ -720,6 +733,19 @@ mod tests {
 
         assert!(!is_recoverable_wpd_error("Disk write error: Access denied"));
         assert!(!is_recoverable_wpd_error("Aborted by user"));
+    }
+
+    #[test]
+    fn test_is_fatal_disk_error() {
+        assert!(is_fatal_disk_error(
+            "Disk full (Disk write error): There is not enough space on the disk. (os error 112)"
+        ));
+        assert!(is_fatal_disk_error("Write failed (os error 39)"));
+        assert!(is_fatal_disk_error(
+            "Disk write error: There is not enough space on the disk."
+        ));
+        assert!(!is_fatal_disk_error("Stream read error: 0x8007065D"));
+        assert!(!is_fatal_disk_error("Aborted by user"));
     }
 
     #[test]

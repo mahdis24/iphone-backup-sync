@@ -74,17 +74,6 @@ async fn scan_device(
             },
         );
 
-        let _ = app_handle.emit(
-            "scan-progress",
-            ScanProgressPayload {
-                stage: "connecting".to_string(),
-                message: "Opening session with iPhone...".to_string(),
-                current: 0,
-                total: 0,
-                percent: 5,
-            },
-        );
-
         let device_guard = wpd::open_device(&device_id)?;
 
         if cancel_scan_flag.load(Ordering::Relaxed) {

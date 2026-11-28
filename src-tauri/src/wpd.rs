@@ -221,11 +221,13 @@ where
             .Properties()
             .map_err(|e| format!("Failed to get content properties: {}", e))?;
 
+        let scan_keys = create_scan_property_keys();
         let mut all_files = Vec::new();
         // Traverse starting from root "DEVICE"
         traverse_object(
             &content,
             &properties,
+            scan_keys.as_ref(),
             "DEVICE",
             "",
             &mut all_files,
@@ -237,9 +239,26 @@ where
     }
 }
 
+unsafe fn collect_and_free_pwstrs(ids: &mut [PWSTR], count: usize) -> Vec<String> {
+    let mut out = Vec::with_capacity(count);
+    for pwstr in ids.iter_mut().take(count) {
+        if !pwstr.is_null() {
+            let s = unsafe { pwstr.to_string() }.unwrap_or_default();
+            unsafe { CoTaskMemFree(Some(pwstr.as_ptr() as *const _)) };
+            *pwstr = PWSTR::null();
+            if !s.is_empty() {
+                out.push(s);
+            }
+        }
+    }
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
 unsafe fn traverse_object<F>(
     content: &IPortableDeviceContent,
     properties: &IPortableDeviceProperties,
+    scan_keys: Option<&IPortableDeviceKeyCollection>,
     parent_id: &str,
     current_rel_path: &str,
     collected: &mut Vec<DeviceFile>,
@@ -258,7 +277,20 @@ where
         let enum_objects: IEnumPortableDeviceObjectIDs =
             match content.EnumObjects(0, PCWSTR(parent_id_u16.as_ptr()), None) {
                 Ok(e) => e,
-                Err(_) => return Ok(()), // Some objects cannot be enumerated, ignore
+                Err(e) => {
+                    // Top-level non-storage functional objects under DEVICE may not support enumeration,
+                    // but failing on DEVICE itself or inside a media folder must surface an error rather than
+                    // silently returning a truncated scan.
+                    if parent_id == "DEVICE" || !current_rel_path.is_empty() {
+                        let label = if current_rel_path.is_empty() {
+                            parent_id
+                        } else {
+                            current_rel_path
+                        };
+                        return Err(format!("Failed to enumerate folder '{}': {}", label, e));
+                    }
+                    return Ok(());
+                }
             };
 
         loop {
@@ -269,29 +301,31 @@ where
             let mut object_ids: [PWSTR; 32] = [PWSTR::null(); 32];
             let mut fetched: u32 = 0;
             let hr = enum_objects.Next(&mut object_ids, &mut fetched);
-            if hr.is_err() || fetched == 0 {
+            let batch_ids = collect_and_free_pwstrs(&mut object_ids, fetched as usize);
+            if hr.is_err() {
+                let label = if current_rel_path.is_empty() {
+                    parent_id
+                } else {
+                    current_rel_path
+                };
+                return Err(format!(
+                    "Device enumeration interrupted in '{}': {:?}",
+                    label, hr
+                ));
+            }
+            if fetched == 0 {
                 break;
             }
 
-            for &obj_pwstr in object_ids.iter().take(fetched as usize) {
+            for obj_id in batch_ids {
                 if cancel_flag.load(Ordering::Relaxed) {
                     return Err("Scan cancelled by user".to_string());
-                }
-
-                if obj_pwstr.is_null() {
-                    continue;
-                }
-                let obj_id = obj_pwstr.to_string().unwrap_or_default();
-                CoTaskMemFree(Some(obj_pwstr.as_ptr() as *const _));
-
-                if obj_id.is_empty() {
-                    continue;
                 }
 
                 let obj_u16: Vec<u16> = obj_id.encode_utf16().chain(std::iter::once(0)).collect();
                 let pc_obj = PCWSTR(obj_u16.as_ptr());
 
-                let values = match properties.GetValues(pc_obj, None) {
+                let values = match properties.GetValues(pc_obj, scan_keys) {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
@@ -332,6 +366,7 @@ where
                     traverse_object(
                         content,
                         properties,
+                        scan_keys,
                         &obj_id,
                         &next_rel_path,
                         collected,
@@ -370,6 +405,14 @@ where
     }
 }
 
+fn format_disk_io_error(context: &str, err: &std::io::Error) -> String {
+    if matches!(err.raw_os_error(), Some(39 | 112)) {
+        format!("Disk full ({}): {}", context, err)
+    } else {
+        format!("{}: {}", context, err)
+    }
+}
+
 pub fn stream_file_to_disk<F>(
     device: &IPortableDevice,
     object_id: &str,
@@ -397,14 +440,14 @@ where
         // Create parent folder if not present
         if let Some(parent) = dest_path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory {:?}: {}", parent, e))?;
+                .map_err(|e| format_disk_io_error(&format!("Failed to create directory {:?}", parent), &e))?;
         }
 
         // Write to temporary .part file first to protect against incomplete files
         let part_path = get_part_path(dest_path);
 
         let mut file = File::create(&part_path)
-            .map_err(|e| format!("Failed to create temporary file {:?}: {}", part_path, e))?;
+            .map_err(|e| format_disk_io_error(&format!("Failed to create temporary file {:?}", part_path), &e))?;
 
         let buf_size = (optimal_buffer_size as usize).clamp(64 * 1024, 256 * 1024);
         let mut buffer = vec![0u8; buf_size];
@@ -437,14 +480,17 @@ where
                 break;
             }
 
-            file.write_all(&buffer[..bytes_read as usize])
-                .map_err(|e| format!("Disk write error: {}", e))?;
+            if let Err(e) = file.write_all(&buffer[..bytes_read as usize]) {
+                drop(file);
+                let _ = std::fs::remove_file(&part_path);
+                return Err(format_disk_io_error("Disk write error", &e));
+            }
 
             bytes_copied += bytes_read as u64;
 
             let now = Instant::now();
             let elapsed_since_last = now.duration_since(last_progress_time).as_secs_f64();
-            if elapsed_since_last >= 0.1 || (expected_size > 0 && bytes_copied == expected_size) {
+            if elapsed_since_last >= 0.12 {
                 let total_elapsed = now.duration_since(start_time).as_secs_f64();
                 let speed_bps = if total_elapsed > 0.0 {
                     bytes_copied as f64 / total_elapsed
@@ -456,8 +502,11 @@ where
             }
         }
 
-        file.flush()
-            .map_err(|e| format!("Failed to flush file: {}", e))?;
+        if let Err(e) = file.flush() {
+            drop(file);
+            let _ = std::fs::remove_file(&part_path);
+            return Err(format_disk_io_error("Failed to flush file", &e));
+        }
         drop(file);
 
         // Crucial validation: ensure complete file transfer!
@@ -473,8 +522,12 @@ where
         if dest_path.exists() {
             let _ = std::fs::remove_file(dest_path);
         }
-        std::fs::rename(&part_path, dest_path)
-            .map_err(|e| format!("Failed to rename {:?} to {:?}: {}", part_path, dest_path, e))?;
+        std::fs::rename(&part_path, dest_path).map_err(|e| {
+            format_disk_io_error(
+                &format!("Failed to rename {:?} to {:?}", part_path, dest_path),
+                &e,
+            )
+        })?;
 
         Ok(())
     }
@@ -610,16 +663,28 @@ unsafe fn create_lookup_property_keys() -> Option<IPortableDeviceKeyCollection> 
     Some(keys)
 }
 
+unsafe fn create_scan_property_keys() -> Option<IPortableDeviceKeyCollection> {
+    let keys = unsafe { create_lookup_property_keys() }?;
+    unsafe {
+        let _ = keys.Add(&WPD_OBJECT_SIZE);
+    }
+    Some(keys)
+}
+
 unsafe fn resolve_path_from_parent(
     content: &IPortableDeviceContent,
     properties: &IPortableDeviceProperties,
     lookup_keys: Option<&IPortableDeviceKeyCollection>,
     root_parent_id: &str,
     parts: &[&str],
+    cancel_flag: &AtomicBool,
 ) -> Option<String> {
     let mut current_parent = root_parent_id.to_string();
 
     for (i, &segment) in parts.iter().enumerate() {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return None;
+        }
         let is_last = i == parts.len() - 1;
         let current_parent_u16: Vec<u16> = current_parent
             .encode_utf16()
@@ -635,22 +700,20 @@ unsafe fn resolve_path_from_parent(
         let mut matched_child: Option<(String, bool)> = None;
 
         loop {
+            if cancel_flag.load(Ordering::Relaxed) {
+                return None;
+            }
             let mut sub_ids: [PWSTR; 32] = [PWSTR::null(); 32];
             let mut sub_fetched: u32 = 0;
             let sub_hr = unsafe { enum_sub.Next(&mut sub_ids, &mut sub_fetched) };
+            let batch_ids = unsafe { collect_and_free_pwstrs(&mut sub_ids, sub_fetched as usize) };
             if sub_hr.is_err() || sub_fetched == 0 {
                 break;
             }
 
-            for &child_pwstr in sub_ids.iter().take(sub_fetched as usize) {
-                if child_pwstr.is_null() {
-                    continue;
-                }
-                let child_id = unsafe { child_pwstr.to_string() }.unwrap_or_default();
-                unsafe { CoTaskMemFree(Some(child_pwstr.as_ptr() as *const _)) };
-
-                if child_id.is_empty() || matched_child.is_some() {
-                    continue;
+            for child_id in batch_ids {
+                if cancel_flag.load(Ordering::Relaxed) || matched_child.is_some() {
+                    break;
                 }
 
                 let child_u16: Vec<u16> =
@@ -696,7 +759,12 @@ unsafe fn resolve_path_from_parent(
 pub fn find_object_id_by_path(
     device: &IPortableDevice,
     rel_path: &str,
+    cancel_flag: &AtomicBool,
 ) -> Result<Option<String>, String> {
+    if cancel_flag.load(Ordering::Relaxed) {
+        return Err("Aborted by user".to_string());
+    }
+
     let clean_rel = clean_unicode_markers(rel_path).replace('\\', "/");
     let parts: Vec<&str> = clean_rel
         .split('/')
@@ -725,21 +793,17 @@ pub fn find_object_id_by_path(
 
         let mut storage_ids: Vec<String> = Vec::new();
         loop {
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Err("Aborted by user".to_string());
+            }
             let mut object_ids: [PWSTR; 16] = [PWSTR::null(); 16];
             let mut fetched: u32 = 0;
             let hr = enum_objects.Next(&mut object_ids, &mut fetched);
+            let batch = collect_and_free_pwstrs(&mut object_ids, fetched as usize);
             if hr.is_err() || fetched == 0 {
                 break;
             }
-            for &obj_pwstr in object_ids.iter().take(fetched as usize) {
-                if !obj_pwstr.is_null() {
-                    let id_str = obj_pwstr.to_string().unwrap_or_default();
-                    CoTaskMemFree(Some(obj_pwstr.as_ptr() as *const _));
-                    if !id_str.is_empty() {
-                        storage_ids.push(id_str);
-                    }
-                }
-            }
+            storage_ids.extend(batch);
             if hr == windows::core::HRESULT(1) {
                 break;
             }
@@ -747,12 +811,16 @@ pub fn find_object_id_by_path(
 
         // 2. Traverse down through path segments under each storage container
         for storage_id in storage_ids {
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Err("Aborted by user".to_string());
+            }
             if let Some(found) = resolve_path_from_parent(
                 &content,
                 &properties,
                 lookup_keys.as_ref(),
                 &storage_id,
                 &parts,
+                cancel_flag,
             ) {
                 return Ok(Some(found));
             }
