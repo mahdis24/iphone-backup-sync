@@ -1,6 +1,6 @@
 {
   "name": "iphone-backup-sync",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "High-reliability Windows MTP/WPD photo & video backup tool for iOS devices",
   "private": true,
   "type": "module",
