@@ -439,15 +439,20 @@ where
 
         // Create parent folder if not present
         if let Some(parent) = dest_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format_disk_io_error(&format!("Failed to create directory {:?}", parent), &e))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                format_disk_io_error(&format!("Failed to create directory {:?}", parent), &e)
+            })?;
         }
 
         // Write to temporary .part file first to protect against incomplete files
         let part_path = get_part_path(dest_path);
 
-        let mut file = File::create(&part_path)
-            .map_err(|e| format_disk_io_error(&format!("Failed to create temporary file {:?}", part_path), &e))?;
+        let mut file = File::create(&part_path).map_err(|e| {
+            format_disk_io_error(
+                &format!("Failed to create temporary file {:?}", part_path),
+                &e,
+            )
+        })?;
 
         let buf_size = (optimal_buffer_size as usize).clamp(64 * 1024, 256 * 1024);
         let mut buffer = vec![0u8; buf_size];

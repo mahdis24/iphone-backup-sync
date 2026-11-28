@@ -694,7 +694,10 @@ where
     let (terminal_status, terminal_error) = if let Some(fatal_err) = fatal_abort_error {
         ("aborted".to_string(), Some(fatal_err))
     } else if was_cancelled {
-        ("aborted".to_string(), Some("Sync stopped by user".to_string()))
+        (
+            "aborted".to_string(),
+            Some("Sync stopped by user".to_string()),
+        )
     } else {
         ("finished".to_string(), None)
     };
