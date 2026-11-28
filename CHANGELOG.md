@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-11-28
+
+### Fixed
+
+- **Large-Library UI Freeze & Progress Counter Lag ([#2](https://github.com/mahdis24/iphone-backup-sync/issues/2))**: Virtualized the file table (`44px` fixed row windowing) so only visible rows are rendered in the DOM instead of 70,000-120,000+ rows at once, switched `scannedFiles` to `shallowRef`, replaced `O(N)` per-file summary scans with `O(1)` incremental status transitions, coalesced table refreshes, and throttled per-file `"copying"` IPC progress events so UI counters stay synchronized with disk writes and **Stop Sync** remains responsive.
+- **Disk-Full Abort & Stop Responsiveness**: Tagged Windows storage-full I/O errors (`os error 39` / `112`), stopped `execute_sync` immediately on fatal disk-full errors instead of looping through the remaining queue, surfaced fatal abort messages in the error banner, added `isCancellingSync` button feedback, and checked cancellation flags inside `find_object_id_by_path`.
+- **Silent WPD Scan Truncation**: Updated `traverse_object` to return an error instead of silently succeeding when `EnumObjects` fails on `"DEVICE"` or a media subfolder, or when `IEnumPortableDeviceObjectIDs::Next` fails mid-enumeration, and fetched only the 4 required WPD property keys during `scan_files`.
+- **Duplicate Scan Event & Pending Payload**: Removed duplicate initial `"Opening session with iPhone..."` emission in `scan_device` and updated `startSync` to send only pending files over IPC.
+
 ## [0.4.4] - 2026-11-26
 
 ### Fixed

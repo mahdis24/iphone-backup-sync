@@ -93,11 +93,12 @@ Selecting _Keep Originals_ prevents iOS from attempting on-the-fly HEIC/JPEG or 
 - **Direct WPD & MTP Streaming:** Directly interfaces with the Windows Portable Devices COM subsystem (`IPortableDeviceManager`, `IPortableDevice`, `IPortableDeviceContent`, `IStream`) and compatible with `ifuse` / `libimobiledevice` architectures, eliminating Explorer shell crashes.
 - **Session Lifecycle Management:** Scoped `WpdDeviceGuard` RAII design guarantees that `device.Close()` is always called upon scan completion or cancellation, preventing locked MTP sessions between operations.
 - **Multi-Stage Real-Time Scan Progress:** Transparent progress visualization displaying exact stages (`connecting`, `enumerating`, `indexing`, `classifying`), live file counters, and percentage completion.
-- **Scan & Sync Cancellation:** Instant, safe cancellation for active scans and ongoing batch transfers with automatic purging of temporary `.part` artifacts without blacklisting cancelled items.
+- **Scan & Sync Cancellation:** Instant, safe cancellation for active scans and ongoing batch transfers (including during retry path lookups) with automatic purging of temporary `.part` artifacts without blacklisting cancelled items, plus automatic stop protection if the destination disk runs out of space.
+- **Virtualized High-Volume Table & Throttled IPC Progress:** Windowed row rendering, shallow reactivity, `O(1)` live metric updates, and throttled transfer progress events keep the dashboard responsive and counters synchronized even with 100,000+ media files.
 - **Custom Context Menu & Granular Actions:** Right-click any table row to immediately sync that specific file or toggle its inclusion in the persistent skip list.
 - **Interactive Metric Filters:** Summary cards (Total on iPhone, Total in Backup with live completion updates, NEW Files, Size Mismatch, Already Backed Up, Blacklisted) act as live filters for the table, with a dedicated "Failed" filter for unreadable items.
 - **Resilient Sync Error Recovery:** Files encountering MTP read or stream faults (such as `0x8007001E` or `0x8007065D`) are checked via `GetSupportedResources` and tagged with `ERROR` status with diagnostic details without stalling the queue or freezing the UI.
-- **Recursive DCIM Scanning:** Recursively traverses the iPhone storage root, automatically discovering all media subdirectories (`DCIM/*APPLE`).
+- **Recursive DCIM Scanning:** Recursively traverses the iPhone storage root using targeted WPD property keys, automatically discovering all media subdirectories (`DCIM/*APPLE`) and reporting enumeration interruptions explicitly instead of returning a truncated scan.
 - **Byte-Exact Diffing & Classification:** Scans destination folders via indexed hash maps, classifying assets into:
   - `NEW`: Asset does not exist in target backup directory.
   - `MISMATCH`: Asset exists with a different file size.
